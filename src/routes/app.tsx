@@ -195,8 +195,7 @@ function AppPage() {
         </div>
         {/* Voice/status bar */}
         <div className="h-14 px-2 flex items-center gap-2 bg-sidebar border-t border-border">
-          <img src={currentUser.avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
-          {/* avatar mirror below intentionally uses local override */}
+          <img src={avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium truncate">{currentUser.name}</div>
             <div className="text-xs text-muted-foreground truncate">{statusLabel[currentUser.status]}</div>
