@@ -24,6 +24,7 @@ import {
   X,
   Mic,
   Headphones,
+  Clapperboard,
 } from "lucide-react";
 import {
   channels,
@@ -36,6 +37,7 @@ import {
   type ChannelType,
 } from "@/data/mock";
 import { FynixLogo } from "@/components/FynixLogo";
+import { StudioView } from "@/components/StudioView";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -68,13 +70,15 @@ const channelIcon: Record<ChannelType, typeof Hash> = {
 };
 
 type PanelView = "chat" | "profile" | "settings";
+type PanelViewExt = PanelView | "studio";
 
 function AppPage() {
   const [activeServer, setActiveServer] = useState(servers[0].id);
   const [activeChannel, setActiveChannel] = useState("c1");
   const [msgs, setMsgs] = useState<Message[]>(seedMessages);
   const [draft, setDraft] = useState("");
-  const [view, setView] = useState<PanelView>("chat");
+  const [view, setView] = useState<PanelViewExt>("chat");
+  const [avatar, setAvatar] = useState(currentUser.avatar);
   const [membersOpen, setMembersOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
 
@@ -156,7 +160,7 @@ function AppPage() {
             <Settings className="w-5 h-5 text-muted-foreground" />
           </button>
           <button onClick={() => setView("profile")} className="relative">
-            <img src={currentUser.avatar} alt="" className="w-12 h-12 rounded-2xl object-cover bg-card" />
+            <img src={avatar} alt="" className="w-12 h-12 rounded-2xl object-cover bg-card" />
             <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-sidebar ${statusColor[currentUser.status]}`} />
           </button>
         </div>
@@ -191,7 +195,7 @@ function AppPage() {
         </div>
         {/* Voice/status bar */}
         <div className="h-14 px-2 flex items-center gap-2 bg-sidebar border-t border-border">
-          <img src={currentUser.avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
+          <img src={avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium truncate">{currentUser.name}</div>
             <div className="text-xs text-muted-foreground truncate">{statusLabel[currentUser.status]}</div>
@@ -225,6 +229,7 @@ function AppPage() {
             <IconBtn icon={Pin} />
             <IconBtn icon={Bell} />
             <IconBtn icon={Inbox} />
+            <IconBtn icon={Clapperboard} onClick={() => setView("studio")} />
             <div className="hidden sm:flex items-center gap-2 ml-2 px-3 py-1.5 bg-secondary rounded-md text-sm">
               <Search className="w-3.5 h-3.5" />
               <input className="bg-transparent outline-none placeholder:text-muted-foreground w-36" placeholder="Buscar" />
@@ -271,6 +276,13 @@ function AppPage() {
               )}
               {view === "profile" && <ProfileView key="profile" onClose={() => setView("chat")} />}
               {view === "settings" && <SettingsView key="settings" onClose={() => setView("chat")} />}
+              {view === "studio" && (
+                <StudioView
+                  key="studio"
+                  onClose={() => setView("chat")}
+                  onApplyAvatar={(url) => setAvatar(url)}
+                />
+              )}
             </AnimatePresence>
           </section>
 
