@@ -116,7 +116,7 @@ function AvatarBuilder({ onApply }: { onApply: (dataUrl: string) => void }) {
         <button
           onClick={() => onApply(svgDataUrl)}
           className="px-5 py-2.5 rounded-lg text-primary-foreground font-medium"
-          style={{ backgroundImage: "var(--gradient-phoenix)" }}
+          style={{ backgroundImage: "var(--gradient-dexy)" }}
         >
           Aplicar avatar
         </button>
@@ -269,7 +269,7 @@ function Recorder() {
           <button
             onClick={start}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-primary-foreground"
-            style={{ backgroundImage: "var(--gradient-phoenix)" }}
+            style={{ backgroundImage: "var(--gradient-dexy)" }}
           >
             <Circle className="w-4 h-4 fill-current" />
             Iniciar gravação
@@ -303,7 +303,7 @@ function Recorder() {
           )}
           <a
             href={url}
-            download={`fynix-${mode}-${Date.now()}.webm`}
+            download={`dexy-${mode}-${Date.now()}.webm`}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary border border-border hover:border-primary/40 text-sm"
           >
             <Download className="w-4 h-4" />
@@ -389,7 +389,7 @@ function ScreenMirror() {
           <button
             onClick={start}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-primary-foreground"
-            style={{ backgroundImage: "var(--gradient-phoenix)" }}
+            style={{ backgroundImage: "var(--gradient-dexy)" }}
           >
             <Monitor className="w-4 h-4" />
             Espelhar tela em 4K
@@ -446,7 +446,7 @@ function ScreenMirror() {
           <video src={recUrl} controls className="w-full aspect-video rounded-xl bg-black border border-border" />
           <a
             href={recUrl}
-            download={`fynix-tela-${Date.now()}.webm`}
+            download={`dexy-tela-${Date.now()}.webm`}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary border border-border hover:border-primary/40 text-sm"
           >
             <Download className="w-4 h-4" />

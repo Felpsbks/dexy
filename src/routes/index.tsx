@@ -10,7 +10,8 @@ import {
   Users,
   ArrowRight,
 } from "lucide-react";
-import { FynixLogo } from "@/components/FynixLogo";
+import { DexyLogo } from "@/components/DexyLogo";
+import { useSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -19,21 +20,24 @@ export const Route = createFileRoute("/")({
 const features = [
   { icon: MessageSquare, title: "Canais vivos", desc: "Texto, voz e fóruns organizados por categorias, prontos para qualquer comunidade." },
   { icon: Mic, title: "Voz cristalina", desc: "Salas de voz com baixa latência e áudio adaptativo, sem instalar plugins." },
-  { icon: Sparkles, title: "Design em chamas", desc: "Interface original, animações suaves e um dark mode feito para longas sessões." },
+  { icon: Sparkles, title: "Design em alta voltagem", desc: "Interface original, animações suaves e um dark mode feito para longas sessões." },
   { icon: ShieldCheck, title: "Moderação afiada", desc: "Ferramentas de moderação, papéis granulares e trilhas de auditoria." },
   { icon: Zap, title: "Rápido de verdade", desc: "Construído com stack moderna. Abre em milissegundos, sincroniza em tempo real." },
   { icon: Users, title: "Comunidades primeiro", desc: "Perfis expressivos, reações, respostas em thread e presença ao vivo." },
 ];
 
 function Index() {
+  const session = useSession();
+  const appHref = session ? "/app" : "/login";
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* Nav */}
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/60 border-b border-border/50">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-2">
-            <FynixLogo size={28} />
-            <span className="text-lg font-semibold tracking-tight">Fynix</span>
+            <DexyLogo size={28} />
+            <span className="text-lg font-semibold tracking-tight">Dexy</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition">Recursos</a>
@@ -42,15 +46,15 @@ function Index() {
           </nav>
           <div className="flex items-center gap-2">
             <Link
-              to="/app"
+              to={appHref}
               className="hidden sm:inline-flex items-center rounded-full px-4 py-2 text-sm font-medium text-foreground/80 hover:text-foreground transition"
             >
-              Entrar
+              {session ? "Abrir app" : "Entrar"}
             </Link>
             <Link
-              to="/app"
+              to={appHref}
               className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition hover:brightness-110"
-              style={{ backgroundImage: "var(--gradient-phoenix)" }}
+              style={{ backgroundImage: "var(--gradient-dexy)" }}
             >
               Abrir aplicação <ArrowRight className="w-4 h-4" />
             </Link>
@@ -62,7 +66,7 @@ function Index() {
       <section className="relative">
         <div
           className="absolute inset-0 -z-10"
-          style={{ backgroundImage: "var(--gradient-ember)" }}
+          style={{ backgroundImage: "var(--gradient-glow)" }}
         />
         <div className="max-w-7xl mx-auto px-6 pt-24 pb-32 text-center">
           <motion.div
@@ -83,9 +87,9 @@ function Index() {
             Onde comunidades <br />
             <span
               className="bg-clip-text text-transparent"
-              style={{ backgroundImage: "var(--gradient-phoenix)" }}
+              style={{ backgroundImage: "var(--gradient-dexy)" }}
             >
-              renascem em chamas.
+              ganham vida em neon.
             </span>
           </motion.h1>
           <motion.p
@@ -94,7 +98,7 @@ function Index() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="mt-6 max-w-2xl mx-auto text-lg text-muted-foreground"
           >
-            Fynix reúne conversas por texto, voz e fóruns em uma única interface
+            Dexy reúne conversas por texto, voz e fóruns em uma única interface
             desenhada para pessoas criativas. Sem ruído. Sem fricção.
           </motion.p>
           <motion.div
@@ -104,9 +108,9 @@ function Index() {
             className="mt-10 flex flex-wrap items-center justify-center gap-3"
           >
             <Link
-              to="/app"
+              to={appHref}
               className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition hover:brightness-110"
-              style={{ backgroundImage: "var(--gradient-phoenix)" }}
+              style={{ backgroundImage: "var(--gradient-dexy)" }}
             >
               Abrir aplicação <ArrowRight className="w-4 h-4" />
             </Link>
@@ -128,10 +132,10 @@ function Index() {
           >
             <div className="rounded-2xl overflow-hidden bg-sidebar aspect-[16/9] grid grid-cols-[64px_220px_1fr]">
               <div className="bg-sidebar border-r border-border flex flex-col items-center gap-2 py-4">
-                {["F", "E", "N", "P"].map((l, i) => (
+                {["D", "E", "N", "P"].map((l, i) => (
                   <div
                     key={i}
-                    className="w-10 h-10 rounded-2xl grid place-items-center text-sm font-bold bg-gradient-to-br from-orange-500 to-rose-600 text-white"
+                    className="w-10 h-10 rounded-2xl grid place-items-center text-sm font-bold bg-gradient-to-br from-[#00D8FF] to-[#8DFF2F] text-[#121417]"
                   >
                     {l}
                   </div>
@@ -181,7 +185,7 @@ function Index() {
             >
               <div
                 className="w-11 h-11 rounded-xl grid place-items-center text-primary-foreground"
-                style={{ backgroundImage: "var(--gradient-phoenix)" }}
+                style={{ backgroundImage: "var(--gradient-dexy)" }}
               >
                 <f.icon className="w-5 h-5" />
               </div>
@@ -197,12 +201,12 @@ function Index() {
         <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2">
-              <FynixLogo size={24} />
-              <span className="font-semibold">Fynix</span>
+              <DexyLogo size={24} />
+              <span className="font-semibold">Dexy</span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground max-w-sm">
               Uma plataforma independente para comunidades criativas.
-              © {new Date().getFullYear()} Fynix Labs.
+              © {new Date().getFullYear()} Dexy Labs.
             </p>
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">

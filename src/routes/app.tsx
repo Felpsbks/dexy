@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Hash,
@@ -25,29 +25,44 @@ import {
   Mic,
   Headphones,
   Clapperboard,
+  Loader2,
+  LogOut,
 } from "lucide-react";
-import {
-  channels,
-  currentUser,
-  messages as seedMessages,
-  servers,
-  users,
-  type Message,
-  type UserStatus,
-  type ChannelType,
-} from "@/data/mock";
-import { FynixLogo } from "@/components/FynixLogo";
+import { DexyLogo } from "@/components/DexyLogo";
 import { StudioView } from "@/components/StudioView";
+import { supabase } from "@/lib/supabase";
+import { useSession } from "@/lib/auth";
+import {
+  useChannels,
+  useDeleteMessage,
+  useEditMessage,
+  useMembers,
+  useMessages,
+  useProfile,
+  useSendMessage,
+  useServers,
+  useToggleReaction,
+  useUpdateProfile,
+  type MemberWithProfile,
+  type MessageWithAuthor,
+} from "@/lib/queries";
+import type { Database } from "@/lib/database.types";
 
 export const Route = createFileRoute("/app")({
   head: () => ({
     meta: [
-      { title: "Fynix — Aplicação" },
-      { name: "description", content: "Espaço de trabalho do Fynix — conversas, canais e comunidades." },
+      { title: "Dexy — Aplicação" },
+      { name: "description", content: "Espaço de trabalho do Dexy — conversas, canais e comunidades." },
     ],
   }),
   component: AppPage,
 });
+
+type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+type Server = Database["public"]["Tables"]["servers"]["Row"];
+type Channel = Database["public"]["Tables"]["channels"]["Row"];
+type UserStatus = "online" | "idle" | "dnd" | "offline";
+type ChannelType = "text" | "voice" | "forum";
 
 const statusColor: Record<UserStatus, string> = {
   online: "bg-emerald-500",
@@ -69,47 +84,120 @@ const channelIcon: Record<ChannelType, typeof Hash> = {
   forum: MessageSquareText,
 };
 
+function avatarFor(profile: Pick<Profile, "id" | "avatar_url">) {
+  return profile.avatar_url || `https://api.dicebear.com/9.x/glass/svg?seed=${profile.id}`;
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function aggregateReactions(
+  rows: { emoji: string; user_id: string }[],
+  myId: string | undefined,
+) {
+  const map = new Map<string, { emoji: string; count: number; reacted: boolean }>();
+  for (const r of rows) {
+    const existing = map.get(r.emoji);
+    if (existing) {
+      existing.count += 1;
+      if (r.user_id === myId) existing.reacted = true;
+    } else {
+      map.set(r.emoji, { emoji: r.emoji, count: 1, reacted: r.user_id === myId });
+    }
+  }
+  return Array.from(map.values());
+}
+
 type PanelView = "chat" | "profile" | "settings";
 type PanelViewExt = PanelView | "studio";
 
 function AppPage() {
-  const [activeServer, setActiveServer] = useState(servers[0].id);
-  const [activeChannel, setActiveChannel] = useState("c1");
-  const [msgs, setMsgs] = useState<Message[]>(seedMessages);
+  const router = useRouter();
+  const session = useSession();
+  const userId = session?.user.id;
+
+  const { data: profile } = useProfile(userId);
+  const { data: servers = [] } = useServers();
+  const [activeServer, setActiveServer] = useState<string | undefined>(undefined);
+  const { data: channels = [] } = useChannels(activeServer);
+  const [activeChannel, setActiveChannel] = useState<string | undefined>(undefined);
+  const { data: members = [] } = useMembers(activeServer);
+  const { data: messages = [] } = useMessages(activeChannel);
+
+  const sendMessage = useSendMessage(activeChannel, userId);
+  const editMessage = useEditMessage(activeChannel);
+  const deleteMessage = useDeleteMessage(activeChannel);
+  const toggleReaction = useToggleReaction(activeChannel, userId);
+  const updateProfile = useUpdateProfile(userId);
+
   const [draft, setDraft] = useState("");
   const [view, setView] = useState<PanelViewExt>("chat");
-  const [avatar, setAvatar] = useState(currentUser.avatar);
   const [membersOpen, setMembersOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
 
-  const channel = channels.find((c) => c.id === activeChannel)!;
+  useEffect(() => {
+    if (session === null) router.navigate({ to: "/" });
+  }, [session, router]);
+
+  useEffect(() => {
+    if (!activeServer && servers.length > 0) setActiveServer(servers[0].id);
+  }, [servers, activeServer]);
+
+  useEffect(() => {
+    if (channels.length > 0 && !channels.some((c) => c.id === activeChannel)) {
+      setActiveChannel(channels[0].id);
+    }
+  }, [channels, activeChannel]);
+
+  useEffect(() => {
+    if (userId && profile && profile.status !== "online") {
+      updateProfile.mutate({ status: "online" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, profile?.status]);
+
   const categorized = useMemo(() => {
-    const map = new Map<string, typeof channels>();
+    const map = new Map<string, Channel[]>();
     channels.forEach((c) => {
       const arr = map.get(c.category) ?? [];
       arr.push(c);
       map.set(c.category, arr);
     });
     return Array.from(map.entries());
-  }, []);
+  }, [channels]);
 
-  const channelMsgs = msgs.filter((m) => m.channelId === activeChannel);
+  if (session === undefined) {
+    return <LoadingScreen />;
+  }
+  if (!session) {
+    return null;
+  }
+  if (!profile) {
+    return <LoadingScreen />;
+  }
+
+  const channel = channels.find((c) => c.id === activeChannel);
+  if (!activeServer || !channel) {
+    return <LoadingScreen />;
+  }
 
   const send = () => {
     const text = draft.trim();
     if (!text) return;
-    setMsgs((prev) => [
-      ...prev,
-      {
-        id: `local_${Date.now()}`,
-        authorId: currentUser.id,
-        channelId: activeChannel,
-        content: text,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        reactions: [],
-      },
-    ]);
+    sendMessage.mutate(text);
     setDraft("");
+  };
+
+  const handleReact = (mid: string, emoji: string) => {
+    const msg = messages.find((m) => m.id === mid);
+    const already = msg?.reactions.some((r) => r.user_id === userId && r.emoji === emoji) ?? false;
+    toggleReaction.mutate({ messageId: mid, emoji, reacted: already });
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    router.navigate({ to: "/" });
   };
 
   return (
@@ -117,10 +205,10 @@ function AppPage() {
       {/* Server rail */}
       <aside className="hidden sm:flex w-[72px] shrink-0 flex-col items-center gap-2 py-3 bg-sidebar border-r border-border">
         <Link to="/" className="mb-2">
-          <FynixLogo size={36} />
+          <DexyLogo size={36} />
         </Link>
         <div className="w-8 h-px bg-border" />
-        {servers.map((s) => {
+        {servers.map((s: Server) => {
           const active = s.id === activeServer;
           return (
             <button
@@ -135,17 +223,14 @@ function AppPage() {
                 }`}
               />
               <div
-                className={`w-12 h-12 grid place-items-center text-white font-bold bg-gradient-to-br ${s.color} transition-all ${
+                className={`w-12 h-12 grid place-items-center text-white font-bold bg-gradient-to-br ${
+                  s.color ?? "from-[#00D8FF] to-[#8DFF2F]"
+                } transition-all ${
                   active ? "rounded-2xl shadow-[var(--shadow-glow)]" : "rounded-3xl group-hover:rounded-2xl"
                 }`}
               >
-                {s.initial}
+                {s.icon_initial ?? s.name.charAt(0).toUpperCase()}
               </div>
-              {s.unread ? (
-                <span className="absolute -bottom-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-accent text-accent-foreground text-[10px] font-bold grid place-items-center border-2 border-sidebar">
-                  {s.unread}
-                </span>
-              ) : null}
             </button>
           );
         })}
@@ -160,8 +245,12 @@ function AppPage() {
             <Settings className="w-5 h-5 text-muted-foreground" />
           </button>
           <button onClick={() => setView("profile")} className="relative">
-            <img src={avatar} alt="" className="w-12 h-12 rounded-2xl object-cover bg-card" />
-            <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-sidebar ${statusColor[currentUser.status]}`} />
+            <img src={avatarFor(profile)} alt="" className="w-12 h-12 rounded-2xl object-cover bg-card" />
+            <span
+              className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-sidebar ${
+                statusColor[profile.status as UserStatus]
+              }`}
+            />
           </button>
         </div>
       </aside>
@@ -195,10 +284,12 @@ function AppPage() {
         </div>
         {/* Voice/status bar */}
         <div className="h-14 px-2 flex items-center gap-2 bg-sidebar border-t border-border">
-          <img src={avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
+          <img src={avatarFor(profile)} alt="" className="w-8 h-8 rounded-full object-cover" />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium truncate">{currentUser.name}</div>
-            <div className="text-xs text-muted-foreground truncate">{statusLabel[currentUser.status]}</div>
+            <div className="text-sm font-medium truncate">{profile.name}</div>
+            <div className="text-xs text-muted-foreground truncate">
+              {statusLabel[profile.status as UserStatus]}
+            </div>
           </div>
           <button className="p-2 rounded hover:bg-secondary text-muted-foreground"><Mic className="w-4 h-4" /></button>
           <button className="p-2 rounded hover:bg-secondary text-muted-foreground"><Headphones className="w-4 h-4" /></button>
@@ -213,10 +304,10 @@ function AppPage() {
             className="md:hidden p-2 rounded hover:bg-secondary"
             onClick={() => setMobileSidebar((v) => !v)}
           >
-            <ChannelIconInline type={channel.type} />
+            <ChannelIconInline type={channel.type as ChannelType} />
           </button>
           <div className="flex items-center gap-2 min-w-0">
-            <ChannelIconInline type={channel.type} />
+            <ChannelIconInline type={channel.type as ChannelType} />
             <span className="font-semibold truncate">{channel.name}</span>
             {channel.topic ? (
               <>
@@ -251,20 +342,12 @@ function AppPage() {
                 >
                   <ChatArea
                     channelName={channel.name}
-                    channelType={channel.type}
-                    messages={channelMsgs}
-                    onReact={(mid, emoji) => {
-                      setMsgs((prev) => prev.map((m) => {
-                        if (m.id !== mid) return m;
-                        const existing = m.reactions.find((r) => r.emoji === emoji);
-                        if (existing) {
-                          return { ...m, reactions: m.reactions.map((r) => r.emoji === emoji ? { ...r, count: r.count + 1, reacted: true } : r) };
-                        }
-                        return { ...m, reactions: [...m.reactions, { emoji, count: 1, reacted: true }] };
-                      }));
-                    }}
-                    onEdit={(mid, content) => setMsgs((p) => p.map((m) => m.id === mid ? { ...m, content, edited: true } : m))}
-                    onDelete={(mid) => setMsgs((p) => p.filter((m) => m.id !== mid))}
+                    channelType={channel.type as ChannelType}
+                    messages={messages}
+                    myId={userId}
+                    onReact={handleReact}
+                    onEdit={(mid, content) => editMessage.mutate({ id: mid, content })}
+                    onDelete={(mid) => deleteMessage.mutate(mid)}
                   />
                   <Composer
                     channelName={channel.name}
@@ -274,21 +357,41 @@ function AppPage() {
                   />
                 </motion.div>
               )}
-              {view === "profile" && <ProfileView key="profile" onClose={() => setView("chat")} />}
+              {view === "profile" && (
+                <ProfileView
+                  key="profile"
+                  profile={profile}
+                  saving={updateProfile.isPending}
+                  onSave={(patch) => updateProfile.mutate(patch)}
+                  onSignOut={signOut}
+                  onClose={() => setView("chat")}
+                />
+              )}
               {view === "settings" && <SettingsView key="settings" onClose={() => setView("chat")} />}
               {view === "studio" && (
                 <StudioView
                   key="studio"
                   onClose={() => setView("chat")}
-                  onApplyAvatar={(url) => setAvatar(url)}
+                  onApplyAvatar={(url) => updateProfile.mutate({ avatar_url: url })}
                 />
               )}
             </AnimatePresence>
           </section>
 
-          {membersOpen && view === "chat" && <MembersPanel />}
+          {membersOpen && view === "chat" && <MembersPanel members={members} />}
         </div>
       </main>
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="h-screen w-screen grid place-items-center bg-background text-foreground">
+      <div className="flex flex-col items-center gap-3">
+        <DexyLogo size={40} />
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
     </div>
   );
 }
@@ -313,8 +416,8 @@ function CategoryGroup({
   onSelect,
 }: {
   title: string;
-  list: typeof channels;
-  activeId: string;
+  list: Channel[];
+  activeId: string | undefined;
   onSelect: (id: string) => void;
 }) {
   const [open, setOpen] = useState(true);
@@ -336,7 +439,7 @@ function CategoryGroup({
             className="overflow-hidden mt-1 space-y-0.5"
           >
             {list.map((c) => {
-              const Icon = channelIcon[c.type];
+              const Icon = channelIcon[c.type as ChannelType];
               const active = c.id === activeId;
               return (
                 <button
@@ -364,13 +467,15 @@ function ChatArea({
   channelName,
   channelType,
   messages,
+  myId,
   onReact,
   onEdit,
   onDelete,
 }: {
   channelName: string;
   channelType: ChannelType;
-  messages: Message[];
+  messages: MessageWithAuthor[];
+  myId: string | undefined;
   onReact: (mid: string, emoji: string) => void;
   onEdit: (mid: string, content: string) => void;
   onDelete: (mid: string) => void;
@@ -380,7 +485,7 @@ function ChatArea({
       <div className="pb-6 border-b border-border mb-4">
         <div
           className="w-16 h-16 rounded-3xl grid place-items-center text-primary-foreground mb-4"
-          style={{ backgroundImage: "var(--gradient-phoenix)" }}
+          style={{ backgroundImage: "var(--gradient-dexy)" }}
         >
           {(() => {
             const Icon = channelIcon[channelType];
@@ -391,15 +496,16 @@ function ChatArea({
         <p className="text-sm text-muted-foreground mt-1">Este é o início do canal. Seja gentil.</p>
       </div>
       {messages.map((m, i) => {
-        const author = users.find((u) => u.id === m.authorId) ?? currentUser;
         const prev = messages[i - 1];
-        const compact = prev && prev.authorId === m.authorId;
+        const compact = !!prev && prev.author_id === m.author_id;
         return (
           <MessageRow
             key={m.id}
             message={m}
-            author={author}
-            compact={!!compact}
+            author={m.author}
+            compact={compact}
+            isMine={m.author_id === myId}
+            myId={myId}
             onReact={(e) => onReact(m.id, e)}
             onEdit={(c) => onEdit(m.id, c)}
             onDelete={() => onDelete(m.id)}
@@ -416,13 +522,17 @@ function MessageRow({
   message,
   author,
   compact,
+  isMine,
+  myId,
   onReact,
   onEdit,
   onDelete,
 }: {
-  message: Message;
-  author: (typeof users)[number];
+  message: MessageWithAuthor;
+  author: Profile;
   compact: boolean;
+  isMine: boolean;
+  myId: string | undefined;
   onReact: (emoji: string) => void;
   onEdit: (content: string) => void;
   onDelete: () => void;
@@ -431,6 +541,8 @@ function MessageRow({
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(message.content);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const reactions = useMemo(() => aggregateReactions(message.reactions, myId), [message.reactions, myId]);
+  const timestamp = formatTime(message.created_at);
 
   return (
     <motion.div
@@ -443,17 +555,16 @@ function MessageRow({
     >
       {compact ? (
         <div className="w-10 shrink-0 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 text-right pr-1 pt-1">
-          {message.timestamp}
+          {timestamp}
         </div>
       ) : (
-        <img src={author.avatar} alt="" className="w-10 h-10 rounded-full shrink-0 object-cover bg-card" />
+        <img src={avatarFor(author)} alt="" className="w-10 h-10 rounded-full shrink-0 object-cover bg-card" />
       )}
       <div className="min-w-0 flex-1">
         {!compact && (
           <div className="flex items-baseline gap-2">
             <span className="font-semibold text-foreground">{author.name}</span>
-            {author.role && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary">{author.role}</span>}
-            <span className="text-xs text-muted-foreground">{message.timestamp}</span>
+            <span className="text-xs text-muted-foreground">{timestamp}</span>
           </div>
         )}
         {editing ? (
@@ -473,12 +584,12 @@ function MessageRow({
         ) : (
           <div className="text-[15px] leading-relaxed break-words">
             {message.content}
-            {message.edited && <span className="text-[10px] text-muted-foreground ml-1">(editado)</span>}
+            {message.edited_at && <span className="text-[10px] text-muted-foreground ml-1">(editado)</span>}
           </div>
         )}
-        {message.reactions.length > 0 && (
+        {reactions.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
-            {message.reactions.map((r) => (
+            {reactions.map((r) => (
               <button
                 key={r.emoji}
                 onClick={() => onReact(r.emoji)}
@@ -506,7 +617,7 @@ function MessageRow({
           >
             <ActionBtn icon={Smile} onClick={() => setPickerOpen((v) => !v)} />
             <ActionBtn icon={Reply} />
-            {message.authorId === currentUser.id && (
+            {isMine && (
               <>
                 <ActionBtn icon={Pencil} onClick={() => setEditing(true)} />
                 <ActionBtn icon={Trash2} onClick={onDelete} danger />
@@ -573,7 +684,7 @@ function Composer({
           onClick={onSend}
           disabled={!value.trim()}
           className="p-2 rounded-full text-primary-foreground disabled:opacity-40 transition"
-          style={{ backgroundImage: "var(--gradient-phoenix)" }}
+          style={{ backgroundImage: "var(--gradient-dexy)" }}
         >
           <Send className="w-4 h-4" />
         </button>
@@ -582,12 +693,12 @@ function Composer({
   );
 }
 
-function MembersPanel() {
+function MembersPanel({ members }: { members: MemberWithProfile[] }) {
   const grouped = useMemo(() => {
-    const g: Record<UserStatus, typeof users> = { online: [], idle: [], dnd: [], offline: [] };
-    users.forEach((u) => g[u.status].push(u));
+    const g: Record<UserStatus, MemberWithProfile[]> = { online: [], idle: [], dnd: [], offline: [] };
+    members.forEach((m) => g[m.profile.status as UserStatus].push(m));
     return g;
-  }, []);
+  }, [members]);
   const labels: [UserStatus, string][] = [
     ["online", "Online"],
     ["idle", "Ausente"],
@@ -606,15 +717,14 @@ function MembersPanel() {
                 {l} — {list.length}
               </div>
               <div className="space-y-0.5">
-                {list.map((u) => (
-                  <button key={u.id} className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary transition text-left">
+                {list.map((m) => (
+                  <button key={m.user_id} className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary transition text-left">
                     <div className="relative shrink-0">
-                      <img src={u.avatar} alt="" className={`w-8 h-8 rounded-full object-cover ${u.status === "offline" ? "opacity-50" : ""}`} />
-                      <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-card ${statusColor[u.status]}`} />
+                      <img src={avatarFor(m.profile)} alt="" className={`w-8 h-8 rounded-full object-cover ${m.profile.status === "offline" ? "opacity-50" : ""}`} />
+                      <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-card ${statusColor[m.profile.status as UserStatus]}`} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className={`text-sm truncate ${u.status === "offline" ? "text-muted-foreground" : "text-foreground"}`}>{u.name}</div>
-                      {u.role && <div className="text-[11px] text-muted-foreground truncate">{u.role}</div>}
+                      <div className={`text-sm truncate ${m.profile.status === "offline" ? "text-muted-foreground" : "text-foreground"}`}>{m.profile.name}</div>
                     </div>
                   </button>
                 ))}
@@ -627,10 +737,24 @@ function MembersPanel() {
   );
 }
 
-function ProfileView({ onClose }: { onClose: () => void }) {
-  const [name, setName] = useState(currentUser.name);
-  const [bio, setBio] = useState(currentUser.bio);
-  const [status, setStatus] = useState<UserStatus>(currentUser.status);
+function ProfileView({
+  profile,
+  saving,
+  onSave,
+  onSignOut,
+  onClose,
+}: {
+  profile: Profile;
+  saving: boolean;
+  onSave: (patch: Partial<Pick<Profile, "name" | "bio" | "status" | "avatar_url">>) => void;
+  onSignOut: () => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(profile.name);
+  const [bio, setBio] = useState(profile.bio);
+  const status = profile.status as UserStatus;
+  const dirty = name !== profile.name || bio !== profile.bio;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -642,7 +766,9 @@ function ProfileView({ onClose }: { onClose: () => void }) {
         <div
           className="h-48 w-full"
           style={{
-            backgroundImage: `linear-gradient(135deg, oklch(0.62 0.22 15 / 0.6), oklch(0.75 0.19 55 / 0.5)), url(${currentUser.banner})`,
+            backgroundImage: profile.banner_url
+              ? `linear-gradient(135deg, oklch(0.814 0.145 217 / 0.55), oklch(0.897 0.249 135 / 0.4)), url(${profile.banner_url})`
+              : `linear-gradient(135deg, oklch(0.814 0.145 217 / 0.55), oklch(0.897 0.249 135 / 0.4))`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
@@ -651,7 +777,7 @@ function ProfileView({ onClose }: { onClose: () => void }) {
           <X className="w-4 h-4" />
         </button>
         <div className="absolute -bottom-12 left-8">
-          <img src={currentUser.avatar} alt="" className="w-24 h-24 rounded-full border-4 border-background object-cover bg-card" />
+          <img src={avatarFor(profile)} alt="" className="w-24 h-24 rounded-full border-4 border-background object-cover bg-card" />
         </div>
       </div>
       <div className="pt-16 px-8 max-w-2xl space-y-6 pb-12">
@@ -665,7 +791,7 @@ function ProfileView({ onClose }: { onClose: () => void }) {
             {(["online", "idle", "dnd", "offline"] as UserStatus[]).map((s) => (
               <button
                 key={s}
-                onClick={() => setStatus(s)}
+                onClick={() => onSave({ status: s })}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition ${
                   status === s ? "border-primary bg-primary/10 text-foreground" : "border-border bg-secondary text-muted-foreground hover:text-foreground"
                 }`}
@@ -680,8 +806,23 @@ function ProfileView({ onClose }: { onClose: () => void }) {
           <label className="text-xs uppercase tracking-wider text-muted-foreground">Biografia</label>
           <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} className="mt-1 w-full bg-secondary border border-border rounded-lg px-3 py-2 outline-none focus:border-primary resize-none" />
         </div>
-        <div className="text-xs text-muted-foreground">
-          Alterações ficam apenas nesta sessão — o protótipo não persiste dados.
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onSave({ name, bio })}
+            disabled={!dirty || saving}
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40 transition hover:brightness-110"
+            style={{ backgroundImage: "var(--gradient-dexy)" }}
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Salvar alterações
+          </button>
+          <button
+            onClick={onSignOut}
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-destructive border border-destructive/40 hover:bg-destructive/10 transition"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sair da conta
+          </button>
         </div>
       </div>
     </motion.div>
@@ -692,7 +833,7 @@ function SettingsView({ onClose }: { onClose: () => void }) {
   const tabs = ["Aparência", "Tema", "Idioma", "Notificações", "Perfil"];
   const [tab, setTab] = useState(tabs[0]);
   const [density, setDensity] = useState<"cozy" | "compact">("cozy");
-  const [theme, setTheme] = useState<"dark" | "ember" | "midnight">("ember");
+  const [theme, setTheme] = useState<"dark" | "cyan" | "lime">("cyan");
   const [lang, setLang] = useState("pt-BR");
   const [notif, setNotif] = useState({ mentions: true, all: false, sound: true });
 
@@ -741,14 +882,14 @@ function SettingsView({ onClose }: { onClose: () => void }) {
           {tab === "Tema" && (
             <SettingRow label="Tema de cor" desc="Cores são simuladas apenas visualmente.">
               <div className="grid grid-cols-3 gap-3">
-                {(["dark", "ember", "midnight"] as const).map((t) => (
+                {(["dark", "cyan", "lime"] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTheme(t)}
                     className={`p-4 rounded-xl border text-left transition ${theme === t ? "border-primary" : "border-border"}`}
                   >
                     <div className={`h-16 rounded-lg mb-2 bg-gradient-to-br ${
-                      t === "dark" ? "from-zinc-800 to-zinc-950" : t === "ember" ? "from-orange-500 to-rose-700" : "from-indigo-600 to-slate-900"
+                      t === "dark" ? "from-zinc-800 to-zinc-950" : t === "cyan" ? "from-[#00D8FF] to-[#3CEBFF]" : "from-[#8DFF2F] to-[#C8FF2A]"
                     }`} />
                     <div className="text-sm font-medium capitalize">{t}</div>
                   </button>

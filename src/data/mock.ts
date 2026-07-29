@@ -48,9 +48,9 @@ export const currentUser: User = {
   id: "u_me",
   name: "Nova Ryder",
   handle: "nova",
-  avatar: "https://api.dicebear.com/9.x/glass/svg?seed=nova&backgroundColor=f97316,ef4444",
+  avatar: "https://api.dicebear.com/9.x/glass/svg?seed=nova&backgroundColor=00D8FF,8DFF2F",
   status: "online",
-  bio: "Construindo coisas com fogo e código. Fundadora do coletivo Fynix.",
+  bio: "Construindo coisas em alta frequência. Fundadora do coletivo Dexy.",
   banner: "https://images.unsplash.com/photo-1614851099175-e5b30eb872bb?w=1200&q=80",
   role: "Fundadora",
 };
@@ -67,7 +67,7 @@ export const users: User[] = [
 ];
 
 export const servers: Server[] = [
-  { id: "s1", name: "Fynix HQ", initial: "F", color: "from-orange-500 to-rose-600", unread: 3 },
+  { id: "s1", name: "Dexy HQ", initial: "D", color: "from-[#00D8FF] to-[#8DFF2F]", unread: 3 },
   { id: "s2", name: "Ember Labs", initial: "E", color: "from-amber-400 to-orange-600" },
   { id: "s3", name: "Neon Guild", initial: "N", color: "from-fuchsia-500 to-indigo-600", unread: 12 },
   { id: "s4", name: "Pixel Foundry", initial: "P", color: "from-emerald-400 to-teal-600" },
@@ -76,7 +76,7 @@ export const servers: Server[] = [
 
 export const channels: Channel[] = [
   { id: "c1", name: "boas-vindas", type: "text", category: "Geral", topic: "Diga oi para todo mundo aqui." },
-  { id: "c2", name: "anúncios", type: "text", category: "Geral", topic: "Novidades oficiais da Fynix." },
+  { id: "c2", name: "anúncios", type: "text", category: "Geral", topic: "Novidades oficiais da Dexy." },
   { id: "c3", name: "conversa-geral", type: "text", category: "Comunidade", topic: "Papo livre, sem regras rígidas." },
   { id: "c4", name: "showcase", type: "forum", category: "Comunidade", topic: "Mostre o que você está construindo." },
   { id: "c5", name: "sala-de-voz", type: "voice", category: "Comunidade" },
@@ -107,7 +107,7 @@ export const notifications = [
 export const friends = users.filter((u) => u.id !== "u_me").slice(0, 5);
 
 export const roles = [
-  { id: "r1", name: "Fundadora", color: "#f97316" },
+  { id: "r1", name: "Fundadora", color: "#00D8FF" },
   { id: "r2", name: "Engenharia", color: "#38bdf8" },
   { id: "r3", name: "Design", color: "#f472b6" },
   { id: "r4", name: "Comunidade", color: "#a78bfa" },
