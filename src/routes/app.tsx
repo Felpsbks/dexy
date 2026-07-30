@@ -28,24 +28,36 @@ import {
   Loader2,
   LogOut,
   MessageCircle,
+  FileText,
+  Download,
 } from "lucide-react";
 import { DexyLogo } from "@/components/DexyLogo";
 import { StudioView } from "@/components/StudioView";
+import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/auth";
 import {
+  useAddAttachment,
+  useAttachmentUrl,
   useChannels,
   useDeleteMessage,
   useEditMessage,
+  useMarkNotificationRead,
   useMembers,
   useMessages,
+  useNotifications,
   useProfile,
+  useSearchMessages,
   useSendMessage,
   useServers,
   useToggleReaction,
   useUpdateProfile,
+  useUploadAttachment,
+  type Attachment,
   type MemberWithProfile,
   type MessageWithAuthor,
+  type Notification,
+  type SearchResult,
 } from "@/lib/queries";
 import type { Database } from "@/lib/database.types";
 
@@ -141,14 +153,24 @@ function AppPage() {
   const deleteMessage = useDeleteMessage(activeChannel);
   const toggleReaction = useToggleReaction(activeChannel, userId);
   const updateProfile = useUpdateProfile(userId);
+  const uploadAttachment = useUploadAttachment();
+  const addAttachment = useAddAttachment(activeChannel);
+  const { data: notifications = [] } = useNotifications(userId);
+  const markNotificationRead = useMarkNotificationRead(userId);
 
   const [draft, setDraft] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
   const [view, setView] = useState<PanelViewExt>("chat");
   const [membersOpen, setMembersOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [railMode, setRailMode] = useState<"servers" | "dm">("servers");
   const [activeConversationId, setActiveConversationId] = useState<string | undefined>(undefined);
   const [activeDmProfile, setActiveDmProfile] = useState<Profile | undefined>(undefined);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const channelIds = useMemo(() => channels.map((c) => c.id), [channels]);
+  const { data: searchResults = [], isFetching: searching } = useSearchMessages(channelIds, searchQuery);
 
   useEffect(() => {
     if (session === null) router.navigate({ to: "/" });
@@ -196,12 +218,50 @@ function AppPage() {
     return <LoadingScreen />;
   }
 
-  const send = () => {
+  const send = async () => {
     const text = draft.trim();
-    if (!text) return;
-    sendMessage.mutate(text);
-    setDraft("");
+    if (!text && !pendingFile) return;
+    setAttachError(null);
+    try {
+      const message = await sendMessage.mutateAsync(text);
+      if (pendingFile && message) {
+        const uploaded = await uploadAttachment.mutateAsync({ channelId: channel.id, file: pendingFile });
+        await addAttachment.mutateAsync({ messageId: message.id, ...uploaded });
+      }
+      setDraft("");
+      setPendingFile(null);
+    } catch {
+      setAttachError("Não foi possível enviar. Tente novamente.");
+    }
   };
+
+  const handlePickFile = (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      setAttachError("Arquivo muito grande (máx. 10MB).");
+      return;
+    }
+    setAttachError(null);
+    setPendingFile(file);
+  };
+
+  const handleNotificationClick = (n: Notification) => {
+    markNotificationRead.mutate(n.id);
+    if (n.type === "dm_message" && n.related_id) {
+      setRailMode("dm");
+      setView("chat");
+    } else if (n.type === "friend_request") {
+      setRailMode("dm");
+      setView("chat");
+    }
+    setNotificationsOpen(false);
+  };
+
+  const handleSearchSelect = (r: SearchResult) => {
+    setActiveChannel(r.channel.id);
+    setSearchQuery("");
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleReact = (mid: string, emoji: string) => {
     const msg = messages.find((m) => m.id === mid);
@@ -389,12 +449,45 @@ function AppPage() {
             {railMode === "servers" && (
               <>
                 <IconBtn icon={Pin} />
-                <IconBtn icon={Bell} />
+                <div className="relative">
+                  <IconBtn icon={Bell} onClick={() => setNotificationsOpen((v) => !v)} />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 rounded-full bg-destructive text-white text-[10px] font-semibold grid place-items-center pointer-events-none">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                  <AnimatePresence>
+                    {notificationsOpen && (
+                      <NotificationsPanel
+                        notifications={notifications}
+                        onSelect={handleNotificationClick}
+                        onClose={() => setNotificationsOpen(false)}
+                      />
+                    )}
+                  </AnimatePresence>
+                </div>
                 <IconBtn icon={Inbox} />
                 <IconBtn icon={Clapperboard} onClick={() => setView("studio")} />
-                <div className="hidden sm:flex items-center gap-2 ml-2 px-3 py-1.5 bg-secondary rounded-md text-sm">
-                  <Search className="w-3.5 h-3.5" />
-                  <input className="bg-transparent outline-none placeholder:text-muted-foreground w-36" placeholder="Buscar" />
+                <div className="relative hidden sm:block">
+                  <div className="flex items-center gap-2 ml-2 px-3 py-1.5 bg-secondary rounded-md text-sm">
+                    <Search className="w-3.5 h-3.5" />
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-transparent outline-none placeholder:text-muted-foreground w-36"
+                      placeholder="Buscar"
+                    />
+                  </div>
+                  <AnimatePresence>
+                    {searchQuery.trim().length >= 2 && (
+                      <SearchResultsPanel
+                        results={searchResults}
+                        loading={searching}
+                        onSelect={handleSearchSelect}
+                        onClose={() => setSearchQuery("")}
+                      />
+                    )}
+                  </AnimatePresence>
                 </div>
                 <IconBtn icon={Users} onClick={() => setMembersOpen((v) => !v)} />
               </>
@@ -448,6 +541,11 @@ function AppPage() {
                     value={draft}
                     onChange={setDraft}
                     onSend={send}
+                    sending={sendMessage.isPending || uploadAttachment.isPending || addAttachment.isPending}
+                    pendingFile={pendingFile}
+                    onPickFile={handlePickFile}
+                    onRemoveFile={() => setPendingFile(null)}
+                    error={attachError}
                   />
                 </motion.div>
               )}
@@ -500,6 +598,57 @@ function IconBtn({ icon: Icon, onClick }: { icon: typeof Bell; onClick?: () => v
     <button onClick={onClick} className="p-2 rounded hover:bg-secondary transition">
       <Icon className="w-4 h-4" />
     </button>
+  );
+}
+
+function SearchResultsPanel({
+  results,
+  loading,
+  onSelect,
+  onClose,
+}: {
+  results: SearchResult[];
+  loading: boolean;
+  onSelect: (r: SearchResult) => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.15 }}
+        className="absolute right-0 top-11 z-50 w-80 max-h-96 overflow-y-auto bg-card border border-border rounded-xl shadow-xl"
+      >
+        {loading ? (
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> Buscando...
+          </div>
+        ) : results.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">Nenhum resultado.</div>
+        ) : (
+          <div className="py-1">
+            {results.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => onSelect(r)}
+                className="w-full text-left px-4 py-2.5 hover:bg-secondary/50 transition"
+              >
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Hash className="w-3 h-3" />
+                  {r.channel.name}
+                  <span className="mx-1">·</span>
+                  {r.author.name}
+                </div>
+                <div className="text-sm truncate mt-0.5">{r.content}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </>
   );
 }
 
@@ -681,6 +830,13 @@ function MessageRow({
             {message.edited_at && <span className="text-[10px] text-muted-foreground ml-1">(editado)</span>}
           </div>
         )}
+        {message.attachments.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {message.attachments.map((a) => (
+              <AttachmentPreview key={a.id} attachment={a} />
+            ))}
+          </div>
+        )}
         {reactions.length > 0 && (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {reactions.map((r) => (
@@ -736,6 +892,45 @@ function MessageRow({
   );
 }
 
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
+
+function AttachmentPreview({ attachment }: { attachment: Attachment }) {
+  const { data: url } = useAttachmentUrl(attachment.path);
+  const isImage = attachment.type.startsWith("image/") || IMAGE_EXT.test(attachment.name);
+
+  if (isImage) {
+    return url ? (
+      <a href={url} target="_blank" rel="noreferrer" className="block max-w-xs">
+        <img
+          src={url}
+          alt={attachment.name}
+          className="max-w-xs max-h-64 rounded-lg border border-border object-cover"
+        />
+      </a>
+    ) : (
+      <div className="w-40 h-28 rounded-lg bg-secondary border border-border grid place-items-center">
+        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-2 bg-secondary border border-border rounded-lg px-3 py-2 hover:border-primary/50 transition max-w-xs"
+    >
+      <FileText className="w-4 h-4 text-primary shrink-0" />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm truncate">{attachment.name}</div>
+        <div className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</div>
+      </div>
+      <Download className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+    </a>
+  );
+}
+
 function ActionBtn({ icon: Icon, onClick, danger }: { icon: typeof Bell; onClick?: () => void; danger?: boolean }) {
   return (
     <button onClick={onClick} className={`p-2 hover:bg-secondary transition ${danger ? "text-destructive" : "text-muted-foreground hover:text-foreground"}`}>
@@ -744,21 +939,64 @@ function ActionBtn({ icon: Icon, onClick, danger }: { icon: typeof Bell; onClick
   );
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function Composer({
   channelName,
   value,
   onChange,
   onSend,
+  sending,
+  pendingFile,
+  onPickFile,
+  onRemoveFile,
+  error,
 }: {
   channelName: string;
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  sending: boolean;
+  pendingFile: File | null;
+  onPickFile: (file: File) => void;
+  onRemoveFile: () => void;
+  error: string | null;
 }) {
+  const fileInputId = "composer-file-input";
   return (
     <div className="px-2 sm:px-6 pb-4 pt-1">
+      {pendingFile && (
+        <div className="mb-2 flex items-center gap-2 bg-secondary border border-border rounded-lg px-3 py-2 w-fit max-w-full">
+          <FileText className="w-4 h-4 text-primary shrink-0" />
+          <span className="text-sm truncate max-w-50">{pendingFile.name}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{formatFileSize(pendingFile.size)}</span>
+          <button onClick={onRemoveFile} className="p-0.5 rounded hover:bg-background text-muted-foreground shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+      {error && <p className="mb-2 text-xs text-destructive">{error}</p>}
       <div className="flex items-end gap-2 bg-secondary rounded-xl border border-border focus-within:border-primary transition px-3 py-2">
-        <button className="p-2 rounded-full hover:bg-background text-muted-foreground"><Paperclip className="w-4 h-4" /></button>
+        <input
+          id={fileInputId}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onPickFile(file);
+            e.target.value = "";
+          }}
+        />
+        <label
+          htmlFor={fileInputId}
+          className="p-2 rounded-full hover:bg-background text-muted-foreground cursor-pointer"
+        >
+          <Paperclip className="w-4 h-4" />
+        </label>
         <textarea
           rows={1}
           value={value}
@@ -776,11 +1014,11 @@ function Composer({
         <button className="p-2 rounded-full hover:bg-background text-muted-foreground"><Smile className="w-4 h-4" /></button>
         <button
           onClick={onSend}
-          disabled={!value.trim()}
+          disabled={(!value.trim() && !pendingFile) || sending}
           className="p-2 rounded-full text-primary-foreground disabled:opacity-40 transition"
           style={{ backgroundImage: "var(--gradient-dexy)" }}
         >
-          <Send className="w-4 h-4" />
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
       </div>
     </div>

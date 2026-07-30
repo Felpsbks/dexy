@@ -7,9 +7,12 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type Server = Database["public"]["Tables"]["servers"]["Row"];
 type Channel = Database["public"]["Tables"]["channels"]["Row"];
 
+export type Attachment = Database["public"]["Tables"]["message_attachments"]["Row"];
+
 export type MessageWithAuthor = Database["public"]["Tables"]["messages"]["Row"] & {
   author: Profile;
   reactions: Database["public"]["Tables"]["message_reactions"]["Row"][];
+  attachments: Attachment[];
 };
 
 export type MemberWithProfile = Database["public"]["Tables"]["server_members"]["Row"] & {
@@ -93,7 +96,7 @@ export function useMessages(channelId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("messages")
-        .select("*, author:profiles(*), reactions:message_reactions(*)")
+        .select("*, author:profiles(*), reactions:message_reactions(*), attachments:message_attachments(*)")
         .eq("channel_id", channelId!)
         .order("created_at");
       if (error) throw error;
@@ -116,6 +119,11 @@ export function useMessages(channelId: string | undefined) {
         { event: "*", schema: "public", table: "message_reactions" },
         () => queryClient.invalidateQueries({ queryKey }),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "message_attachments" },
+        () => queryClient.invalidateQueries({ queryKey }),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -130,10 +138,13 @@ export function useSendMessage(channelId: string | undefined, authorId: string |
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (content: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("messages")
-        .insert({ channel_id: channelId!, author_id: authorId!, content });
+        .insert({ channel_id: channelId!, author_id: authorId!, content })
+        .select()
+        .single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["messages", channelId] }),
   });
@@ -421,5 +432,131 @@ export function useDeleteDmMessage(conversationId: string | undefined) {
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dm-messages", conversationId] }),
+  });
+}
+
+// --- Attachments ---
+
+export function useUploadAttachment() {
+  return useMutation({
+    mutationFn: async ({ channelId, file }: { channelId: string; file: File }) => {
+      const path = `${channelId}/${crypto.randomUUID()}-${file.name}`;
+      const { error } = await supabase.storage.from("attachments").upload(path, file);
+      if (error) throw error;
+      return { path, name: file.name, type: file.type || "application/octet-stream", size: file.size };
+    },
+  });
+}
+
+export function useAddAttachment(channelId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      messageId: string;
+      path: string;
+      name: string;
+      type: string;
+      size: number;
+    }) => {
+      const { error } = await supabase.from("message_attachments").insert({
+        message_id: params.messageId,
+        path: params.path,
+        name: params.name,
+        type: params.type,
+        size: params.size,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["messages", channelId] }),
+  });
+}
+
+export function useAttachmentUrl(path: string) {
+  return useQuery({
+    queryKey: ["attachment-url", path],
+    queryFn: async () => {
+      const { data, error } = await supabase.storage.from("attachments").createSignedUrl(path, 3600);
+      if (error) throw error;
+      return data.signedUrl;
+    },
+    staleTime: 55 * 60 * 1000,
+  });
+}
+
+// --- Notifications ---
+
+export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+
+export function useNotifications(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  const queryKey = ["notifications", userId];
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId!)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data as Notification[];
+    },
+    enabled: !!userId,
+  });
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        () => queryClient.invalidateQueries({ queryKey }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  return query;
+}
+
+export function useMarkNotificationRead(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications", userId] }),
+  });
+}
+
+// --- Search ---
+
+export type SearchResult = Database["public"]["Tables"]["messages"]["Row"] & {
+  channel: Pick<Channel, "id" | "name">;
+  author: Profile;
+};
+
+export function useSearchMessages(channelIds: string[], query: string) {
+  return useQuery({
+    queryKey: ["search-messages", channelIds, query],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*, channel:channels(id, name), author:profiles(*)")
+        .in("channel_id", channelIds)
+        .ilike("content", `%${query}%`)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data as unknown as SearchResult[];
+    },
+    enabled: channelIds.length > 0 && query.trim().length >= 2,
   });
 }
