@@ -83,43 +83,23 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#05070d] text-white flex flex-col md:flex-row overflow-hidden font-sans relative">
-      {/* Background Grid & Glows */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
-                          linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)`,
-          backgroundSize: "32px 32px",
-        }}
-      />
-
-      {/* Glow effects */}
-      <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#00ff9d] opacity-[0.15] blur-[150px] rounded-full pointer-events-none" />
-      <div className="absolute top-1/2 right-1/4 translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#00e5ff] opacity-[0.1] blur-[120px] rounded-full pointer-events-none" />
-
       {/* Left Panel - Visual/Brand */}
       <div className="hidden lg:flex w-full lg:w-[55%] xl:w-[60%] flex-col relative z-10 p-12 justify-between overflow-visible">
+        {/* Background photo */}
+        <div
+          className="absolute inset-0 -z-10 bg-cover bg-center"
+          style={{ backgroundImage: "url(/login-bg.webp)" }}
+        />
+        <div className="absolute inset-0 -z-10 bg-linear-to-r from-[#05070d] via-[#05070d]/40 to-[#05070d]/70" />
+        <div className="absolute inset-0 -z-10 bg-linear-to-t from-[#05070d] via-transparent to-[#05070d]/50" />
+
         {/* Brand Header */}
-        <div className="flex items-center gap-3">
-          <img src="/logo-wordmark.webp" alt="Dexy" className="h-8 object-contain" />
+        <div className="flex items-center">
+          <img src="/logo-wordmark.webp" alt="Dexy" className="h-11 object-contain" />
         </div>
 
-        {/* Hero Content & Central Image */}
+        {/* Hero Content */}
         <div className="flex-1 relative flex items-center justify-center mt-8 overflow-visible">
-          {/* Main Fox Image */}
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="absolute z-10 w-[520px] xl:w-[680px] translate-y-8"
-          >
-            <img
-              src="/logo.webp"
-              alt="Fox Mascot"
-              className="w-full h-auto drop-shadow-[0_0_80px_rgba(0,255,157,0.5)] drop-shadow-[0_0_160px_rgba(0,229,255,0.3)]"
-            />
-          </motion.div>
-
           {/* Hero Text */}
           <div className="absolute top-0 left-0 max-w-lg z-20">
             <motion.h1
@@ -133,7 +113,7 @@ function LoginPage() {
               Crie comunidades.
               <br />
               Tudo em{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00e5ff] to-[#ccff00]">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-[#00e5ff] to-[#ccff00]">
                 tempo real.
               </span>
             </motion.h1>
@@ -149,7 +129,7 @@ function LoginPage() {
 
           {/* Floating Card: Comunidade Alpha */}
           <motion.div
-            className="absolute left-[-20px] xl:left-[20px] top-[40%] z-30 bg-[#0c101a]/80 backdrop-blur-xl border border-white/5 rounded-2xl p-4 shadow-2xl flex flex-col gap-3 w-64"
+            className="absolute -left-5 xl:left-5 top-[40%] z-30 bg-[#0c101a]/80 backdrop-blur-xl border border-white/5 rounded-2xl p-4 shadow-2xl flex flex-col gap-3 w-64"
             animate={{ y: [0, -10, 0] }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
           >
@@ -314,11 +294,11 @@ function LoginPage() {
 
       {/* Right Panel - Form */}
       <div className="w-full lg:w-[45%] xl:w-[40%] flex items-center justify-center p-6 sm:p-12 z-20 relative">
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-105">
           {/* Form Container with Gradient Border */}
-          <div className="relative rounded-[2rem] p-[1px] overflow-hidden group">
+          <div className="relative rounded-[2rem] p-px overflow-hidden group">
             {/* The Gradient Border */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#00e5ff]/50 via-gray-800/20 to-[#00ff9d]/50 opacity-70" />
+            <div className="absolute inset-0 bg-linear-to-br from-[#00e5ff]/50 via-gray-800/20 to-[#00ff9d]/50 opacity-70" />
 
             {/* Form Inner Content */}
             <div className="relative bg-[#0c101a] rounded-[2rem] p-8 sm:p-10 shadow-2xl backdrop-blur-xl h-full w-full">
@@ -432,7 +412,7 @@ function LoginPage() {
                   disabled={loading}
                   className="w-full relative group overflow-hidden rounded-xl font-bold text-black py-3.5 mt-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#00e5ff] to-[#ccff00] transition-opacity" />
+                  <div className="absolute inset-0 bg-linear-to-r from-[#00e5ff] to-[#ccff00] transition-opacity" />
                   <span className="relative flex items-center gap-2">
                     {loading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />

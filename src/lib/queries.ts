@@ -198,3 +198,228 @@ export function useToggleReaction(channelId: string | undefined, userId: string 
 export function invalidateServers(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: ["servers"] });
 }
+
+// --- Friends ---
+
+export type FriendshipWithProfiles = Database["public"]["Tables"]["friendships"]["Row"] & {
+  requester: Profile;
+  recipient: Profile;
+};
+
+export function useFriendships(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  const queryKey = ["friendships", userId];
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("friendships")
+        .select(
+          "*, requester:profiles!friendships_user_id_fkey(*), recipient:profiles!friendships_friend_id_fkey(*)",
+        )
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+      if (error) throw error;
+      return data as unknown as FriendshipWithProfiles[];
+    },
+    enabled: !!userId,
+  });
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`friendships:${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, () =>
+        queryClient.invalidateQueries({ queryKey }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  return query;
+}
+
+export function useSendFriendRequest(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (handle: string) => {
+      const { data: target, error: lookupError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("handle", handle.trim())
+        .single();
+      if (lookupError || !target) throw new Error("Usuário não encontrado.");
+      if (target.id === userId) throw new Error("Você não pode adicionar a si mesmo.");
+      const { error } = await supabase.from("friendships").insert({ user_id: userId!, friend_id: target.id });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["friendships", userId] }),
+  });
+}
+
+export function useRespondFriendRequest(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      otherUserId,
+      action,
+    }: {
+      otherUserId: string;
+      action: "accept" | "remove";
+    }) => {
+      if (action === "accept") {
+        const { error } = await supabase
+          .from("friendships")
+          .update({ status: "accepted" })
+          .eq("user_id", otherUserId)
+          .eq("friend_id", userId!);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("friendships")
+          .delete()
+          .or(
+            `and(user_id.eq.${userId},friend_id.eq.${otherUserId}),and(user_id.eq.${otherUserId},friend_id.eq.${userId})`,
+          );
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["friendships", userId] }),
+  });
+}
+
+// --- Direct messages ---
+
+export type DmConversationWithProfiles = Database["public"]["Tables"]["dm_conversations"]["Row"] & {
+  userA: Profile;
+  userB: Profile;
+};
+
+export function useDmConversations(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  const queryKey = ["dm-conversations", userId];
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("dm_conversations")
+        .select(
+          "*, userA:profiles!dm_conversations_user_a_fkey(*), userB:profiles!dm_conversations_user_b_fkey(*)",
+        )
+        .or(`user_a.eq.${userId},user_b.eq.${userId}`)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as unknown as DmConversationWithProfiles[];
+    },
+    enabled: !!userId,
+  });
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`dm-conversations:${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "dm_conversations" }, () =>
+        queryClient.invalidateQueries({ queryKey }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  return query;
+}
+
+export function useGetOrCreateDm() {
+  return useMutation({
+    mutationFn: async (otherUserId: string) => {
+      const { data, error } = await supabase.rpc("get_or_create_dm", { other_user_id: otherUserId });
+      if (error) throw error;
+      return data as string;
+    },
+  });
+}
+
+export type DmMessageWithAuthor = Database["public"]["Tables"]["dm_messages"]["Row"] & {
+  author: Profile;
+};
+
+export function useDmMessages(conversationId: string | undefined) {
+  const queryClient = useQueryClient();
+  const queryKey = ["dm-messages", conversationId];
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("dm_messages")
+        .select("*, author:profiles(*)")
+        .eq("conversation_id", conversationId!)
+        .order("created_at");
+      if (error) throw error;
+      return data as unknown as DmMessageWithAuthor[];
+    },
+    enabled: !!conversationId,
+  });
+
+  useEffect(() => {
+    if (!conversationId) return;
+    const channel = supabase
+      .channel(`dm-messages:${conversationId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dm_messages", filter: `conversation_id=eq.${conversationId}` },
+        () => queryClient.invalidateQueries({ queryKey }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
+  return query;
+}
+
+export function useSendDmMessage(conversationId: string | undefined, authorId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (content: string) => {
+      const { error } = await supabase
+        .from("dm_messages")
+        .insert({ conversation_id: conversationId!, author_id: authorId!, content });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dm-messages", conversationId] }),
+  });
+}
+
+export function useEditDmMessage(conversationId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const { error } = await supabase
+        .from("dm_messages")
+        .update({ content, edited_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dm-messages", conversationId] }),
+  });
+}
+
+export function useDeleteDmMessage(conversationId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("dm_messages").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dm-messages", conversationId] }),
+  });
+}

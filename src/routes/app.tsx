@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Hash,
@@ -27,6 +27,7 @@ import {
   Clapperboard,
   Loader2,
   LogOut,
+  MessageCircle,
 } from "lucide-react";
 import { DexyLogo } from "@/components/DexyLogo";
 import { StudioView } from "@/components/StudioView";
@@ -47,6 +48,16 @@ import {
   type MessageWithAuthor,
 } from "@/lib/queries";
 import type { Database } from "@/lib/database.types";
+
+const VoiceRoomView = lazy(() =>
+  import("@/components/VoiceRoomView").then((m) => ({ default: m.VoiceRoomView })),
+);
+const DmSidebar = lazy(() =>
+  import("@/components/DirectMessages").then((m) => ({ default: m.DmSidebar })),
+);
+const DmChatView = lazy(() =>
+  import("@/components/DirectMessages").then((m) => ({ default: m.DmChatView })),
+);
 
 export const Route = createFileRoute("/app")({
   head: () => ({
@@ -135,6 +146,9 @@ function AppPage() {
   const [view, setView] = useState<PanelViewExt>("chat");
   const [membersOpen, setMembersOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [railMode, setRailMode] = useState<"servers" | "dm">("servers");
+  const [activeConversationId, setActiveConversationId] = useState<string | undefined>(undefined);
+  const [activeDmProfile, setActiveDmProfile] = useState<Profile | undefined>(undefined);
 
   useEffect(() => {
     if (session === null) router.navigate({ to: "/" });
@@ -205,15 +219,33 @@ function AppPage() {
       {/* Server rail */}
       <aside className="hidden sm:flex w-[72px] shrink-0 flex-col items-center gap-2 py-3 bg-sidebar border-r border-border">
         <Link to="/" className="mb-2">
-          <DexyLogo size={36} />
+          <DexyLogo size={48} />
         </Link>
+        <button
+          onClick={() => {
+            setRailMode("dm");
+            setView("chat");
+          }}
+          className={`w-12 h-12 grid place-items-center transition-all ${
+            railMode === "dm"
+              ? "rounded-2xl text-primary-foreground shadow-(--shadow-glow)"
+              : "rounded-3xl bg-card text-muted-foreground hover:rounded-2xl hover:bg-secondary"
+          }`}
+          style={railMode === "dm" ? { backgroundImage: "var(--gradient-dexy)" } : undefined}
+          title="Mensagens diretas"
+        >
+          <MessageCircle className="w-5 h-5" />
+        </button>
         <div className="w-8 h-px bg-border" />
         {servers.map((s: Server) => {
-          const active = s.id === activeServer;
+          const active = railMode === "servers" && s.id === activeServer;
           return (
             <button
               key={s.id}
-              onClick={() => setActiveServer(s.id)}
+              onClick={() => {
+                setActiveServer(s.id);
+                setRailMode("servers");
+              }}
               className="group relative"
               title={s.name}
             >
@@ -226,7 +258,7 @@ function AppPage() {
                 className={`w-12 h-12 grid place-items-center text-white font-bold bg-gradient-to-br ${
                   s.color ?? "from-[#00D8FF] to-[#8DFF2F]"
                 } transition-all ${
-                  active ? "rounded-2xl shadow-[var(--shadow-glow)]" : "rounded-3xl group-hover:rounded-2xl"
+                  active ? "rounded-2xl shadow-(--shadow-glow)" : "rounded-3xl group-hover:rounded-2xl"
                 }`}
               >
                 {s.icon_initial ?? s.name.charAt(0).toUpperCase()}
@@ -259,29 +291,51 @@ function AppPage() {
       <aside
         className={`${mobileSidebar ? "flex" : "hidden"} md:flex w-64 shrink-0 flex-col bg-card border-r border-border`}
       >
-        <div className="h-14 px-4 flex items-center justify-between border-b border-border shadow-sm">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-semibold truncate">
-              {servers.find((s) => s.id === activeServer)?.name}
-            </span>
-          </div>
-          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-        </div>
-        <div className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-          {categorized.map(([category, list]) => (
-            <CategoryGroup
-              key={category}
-              title={category}
-              list={list}
-              activeId={activeChannel}
-              onSelect={(id) => {
-                setActiveChannel(id);
-                setView("chat");
-                setMobileSidebar(false);
-              }}
-            />
-          ))}
-        </div>
+        {railMode === "dm" ? (
+          <>
+            <div className="h-14 px-4 flex items-center border-b border-border shadow-sm">
+              <span className="font-semibold">Mensagens diretas</span>
+            </div>
+            <Suspense fallback={<div className="flex-1 grid place-items-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>}>
+              <DmSidebar
+                userId={userId!}
+                activeConversationId={activeConversationId}
+                onOpenConversation={(conversationId, otherProfile) => {
+                  setActiveConversationId(conversationId);
+                  setActiveDmProfile(otherProfile);
+                  setView("chat");
+                  setMobileSidebar(false);
+                }}
+              />
+            </Suspense>
+          </>
+        ) : (
+          <>
+            <div className="h-14 px-4 flex items-center justify-between border-b border-border shadow-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-semibold truncate">
+                  {servers.find((s) => s.id === activeServer)?.name}
+                </span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+            </div>
+            <div className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+              {categorized.map(([category, list]) => (
+                <CategoryGroup
+                  key={category}
+                  title={category}
+                  list={list}
+                  activeId={activeChannel}
+                  onSelect={(id) => {
+                    setActiveChannel(id);
+                    setView("chat");
+                    setMobileSidebar(false);
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
         {/* Voice/status bar */}
         <div className="h-14 px-2 flex items-center gap-2 bg-sidebar border-t border-border">
           <img src={avatarFor(profile)} alt="" className="w-8 h-8 rounded-full object-cover" />
@@ -304,35 +358,75 @@ function AppPage() {
             className="md:hidden p-2 rounded hover:bg-secondary"
             onClick={() => setMobileSidebar((v) => !v)}
           >
-            <ChannelIconInline type={channel.type as ChannelType} />
+            {railMode === "dm" ? (
+              <MessageCircle className="w-5 h-5 text-muted-foreground" />
+            ) : (
+              <ChannelIconInline type={channel.type as ChannelType} />
+            )}
           </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <ChannelIconInline type={channel.type as ChannelType} />
-            <span className="font-semibold truncate">{channel.name}</span>
-            {channel.topic ? (
-              <>
-                <span className="hidden sm:block w-px h-5 bg-border mx-2" />
-                <span className="hidden sm:block text-sm text-muted-foreground truncate">{channel.topic}</span>
-              </>
-            ) : null}
-          </div>
-          <div className="ml-auto flex items-center gap-1 text-muted-foreground">
-            <IconBtn icon={Pin} />
-            <IconBtn icon={Bell} />
-            <IconBtn icon={Inbox} />
-            <IconBtn icon={Clapperboard} onClick={() => setView("studio")} />
-            <div className="hidden sm:flex items-center gap-2 ml-2 px-3 py-1.5 bg-secondary rounded-md text-sm">
-              <Search className="w-3.5 h-3.5" />
-              <input className="bg-transparent outline-none placeholder:text-muted-foreground w-36" placeholder="Buscar" />
+          {railMode === "dm" ? (
+            <div className="flex items-center gap-2 min-w-0">
+              {activeDmProfile && (
+                <>
+                  <img src={avatarFor(activeDmProfile)} alt="" className="w-6 h-6 rounded-full object-cover" />
+                  <span className="font-semibold truncate">{activeDmProfile.name}</span>
+                </>
+              )}
             </div>
-            <IconBtn icon={Users} onClick={() => setMembersOpen((v) => !v)} />
+          ) : (
+            <div className="flex items-center gap-2 min-w-0">
+              <ChannelIconInline type={channel.type as ChannelType} />
+              <span className="font-semibold truncate">{channel.name}</span>
+              {channel.topic ? (
+                <>
+                  <span className="hidden sm:block w-px h-5 bg-border mx-2" />
+                  <span className="hidden sm:block text-sm text-muted-foreground truncate">{channel.topic}</span>
+                </>
+              ) : null}
+            </div>
+          )}
+          <div className="ml-auto flex items-center gap-1 text-muted-foreground">
+            {railMode === "servers" && (
+              <>
+                <IconBtn icon={Pin} />
+                <IconBtn icon={Bell} />
+                <IconBtn icon={Inbox} />
+                <IconBtn icon={Clapperboard} onClick={() => setView("studio")} />
+                <div className="hidden sm:flex items-center gap-2 ml-2 px-3 py-1.5 bg-secondary rounded-md text-sm">
+                  <Search className="w-3.5 h-3.5" />
+                  <input className="bg-transparent outline-none placeholder:text-muted-foreground w-36" placeholder="Buscar" />
+                </div>
+                <IconBtn icon={Users} onClick={() => setMembersOpen((v) => !v)} />
+              </>
+            )}
           </div>
         </div>
 
         <div className="flex-1 flex min-h-0">
           <section className="flex-1 flex flex-col min-w-0">
             <AnimatePresence mode="wait">
-              {view === "chat" && (
+              {view === "chat" && railMode === "dm" && (
+                <Suspense fallback={<div className="flex-1 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+                  {activeConversationId && activeDmProfile ? (
+                    <DmChatView
+                      key={`dm-${activeConversationId}`}
+                      conversationId={activeConversationId}
+                      otherProfile={activeDmProfile}
+                      myId={userId!}
+                    />
+                  ) : (
+                    <div className="flex-1 grid place-items-center text-muted-foreground text-sm">
+                      Selecione um amigo para conversar.
+                    </div>
+                  )}
+                </Suspense>
+              )}
+              {view === "chat" && railMode === "servers" && channel.type === "voice" && (
+                <Suspense fallback={<div className="flex-1 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+                  <VoiceRoomView key={`voice-${channel.id}`} channelId={channel.id} channelName={channel.name} />
+                </Suspense>
+              )}
+              {view === "chat" && railMode === "servers" && channel.type !== "voice" && (
                 <motion.div
                   key="chat"
                   initial={{ opacity: 0 }}
@@ -378,7 +472,7 @@ function AppPage() {
             </AnimatePresence>
           </section>
 
-          {membersOpen && view === "chat" && <MembersPanel members={members} />}
+          {membersOpen && view === "chat" && railMode === "servers" && <MembersPanel members={members} />}
         </div>
       </main>
     </div>
