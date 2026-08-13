@@ -689,7 +689,7 @@ function AppPage() {
   return (
     <ProfilePopoverProvider myId={userId} onEditProfile={() => setView("profile")} onMessage={openDmFromPopover} onSignOut={signOut}>
     {session?.user.is_anonymous && (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full bg-card border border-border shadow-(--shadow-glow) px-4 py-2 text-xs">
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full bg-card border border-border shadow-(--shadow-glow) px-4 py-2 text-xs">
         <span className="text-muted-foreground">
           Você está em modo convidado — vincule um e-mail pra não perder sua conta.
         </span>

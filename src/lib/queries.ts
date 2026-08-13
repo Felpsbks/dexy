@@ -1432,7 +1432,7 @@ export function useSendFriendRequest(userId: string | undefined) {
       const { data: target, error: lookupError } = await supabase
         .from("profiles")
         .select("id")
-        .eq("handle", handle.trim())
+        .ilike("handle", handle.trim())
         .single();
       if (lookupError || !target) throw new Error("Usuário não encontrado.");
       if (target.id === userId) throw new Error("Você não pode adicionar a si mesmo.");
