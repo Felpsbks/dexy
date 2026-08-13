@@ -1034,23 +1034,6 @@ function AppPage() {
               {railMode === "servers" && (
                 <>
                   <IconBtn icon={Pin} />
-                  <div className="relative">
-                    <IconBtn icon={Bell} onClick={() => setNotificationsOpen((v) => !v)} />
-                    {unreadCount > 0 && (
-                      <span className="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 rounded-full bg-destructive text-white text-[10px] font-semibold grid place-items-center pointer-events-none">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    )}
-                    <AnimatePresence>
-                      {notificationsOpen && (
-                        <NotificationsPanel
-                          notifications={notifications}
-                          onSelect={handleNotificationClick}
-                          onClose={() => setNotificationsOpen(false)}
-                        />
-                      )}
-                    </AnimatePresence>
-                  </div>
                   <IconBtn icon={Inbox} />
                   <IconBtn icon={Clapperboard} onClick={() => setView("studio")} />
                   <div className="relative hidden sm:block">
@@ -1085,6 +1068,30 @@ function AppPage() {
                   <IconBtn icon={Users} onClick={() => setMembersOpen((v) => !v)} />
                 </>
               )}
+              {/* Notifications aren't server-specific (dm_message and
+                  friend_request* types are about DM/friends, not servers),
+                  so the bell is always visible here regardless of
+                  railMode -- previously it only rendered inside the
+                  servers-only block above, making it inaccessible from DM
+                  mode. Same state/handlers as before, just no longer
+                  gated. */}
+              <div className="relative">
+                <IconBtn icon={Bell} onClick={() => setNotificationsOpen((v) => !v)} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 min-w-4 h-4 px-1 rounded-full bg-destructive text-white text-[10px] font-semibold grid place-items-center pointer-events-none">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+                <AnimatePresence>
+                  {notificationsOpen && (
+                    <NotificationsPanel
+                      notifications={notifications}
+                      onSelect={handleNotificationClick}
+                      onClose={() => setNotificationsOpen(false)}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
               {railMode === "dm" && activeConversationId && (
                 <IconBtn
                   icon={UserRound}
