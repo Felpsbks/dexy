@@ -1425,25 +1425,77 @@ export function useFriendships(userId: string | undefined) {
   return query;
 }
 
+// A generic, user-safe message for anything that isn't a clean "doesn't
+// exist"/"already X" business outcome -- never leak raw Postgrest/network
+// error text (codes, constraint names, etc.) to the UI.
+const FRIEND_REQUEST_GENERIC_ERROR = "Não foi possível concluir o envio agora. Tente novamente em instantes.";
+
+export type SendFriendRequestOutcome = "sent" | "auto_accepted";
+
 export function useSendFriendRequest(userId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (handle: string) => {
+    mutationFn: async (handleInput: string): Promise<SendFriendRequestOutcome> => {
       // Typing "@handle" (mention-style, like Twitter/Discord) is a natural
       // instinct even though stored handles never include the "@" -- strip
-      // it so both forms find the same profile.
-      const cleanHandle = handle.trim().replace(/^@/, "");
-      const { data: target, error: lookupError } = await supabase
+      // it, plus surrounding whitespace, so both forms find the same
+      // profile. Handles keep their original case in the DB, so the lookup
+      // itself stays case-insensitive (ilike) instead of lowercasing here.
+      const cleanHandle = handleInput.trim().replace(/^@/, "");
+      if (!cleanHandle) throw new Error("Usuário não encontrado.");
+
+      // ilike() treats "%" and "_" as wildcards, not literal characters --
+      // every auto-generated handle contains a "_", so an unescaped search
+      // can silently match more (or different) rows than what was typed.
+      const escapedHandle = cleanHandle.replace(/[%_]/g, "\\$&");
+      const { data: matches, error: lookupError } = await supabase
         .from("profiles")
-        .select("id")
-        .ilike("handle", cleanHandle)
-        .single();
-      if (lookupError || !target) throw new Error("Usuário não encontrado.");
-      if (target.id === userId) throw new Error("Você não pode adicionar a si mesmo.");
-      const { error } = await supabase
-        .from("friendships")
-        .insert({ user_id: userId!, friend_id: target.id });
-      if (error) throw error;
+        .select("id, handle")
+        .ilike("handle", escapedHandle);
+      if (lookupError) {
+        // A real infra/permission failure -- never mislabel this as "user
+        // doesn't exist", which used to hide genuine errors (network
+        // blips, ambiguous multi-row matches, etc.) behind a false claim.
+        throw new Error(FRIEND_REQUEST_GENERIC_ERROR);
+      }
+
+      // ilike is case-insensitive, so two profiles whose handles only
+      // differ by case can both come back for the same search term. Prefer
+      // an exact (case-sensitive) match first; only treat it as a genuine
+      // ambiguity if that doesn't narrow it down to one.
+      let target = matches?.find((m) => m.handle === cleanHandle) ?? null;
+      if (!target && matches?.length === 1) target = matches[0];
+      if (!target && matches && matches.length > 1) {
+        throw new Error("Não foi possível identificar esse usuário com precisão. Confira o @username exato.");
+      }
+      if (!target) throw new Error("Usuário não encontrado.");
+
+      // send_friend_request() (migration 20260813180000) does the
+      // self/already-friends/already-pending/blocked checks and the
+      // insert-or-merge-to-accepted decision atomically, inside a single
+      // transaction serialized by an advisory lock keyed to this pair --
+      // that's what closes the residual race a client-side check-then-act
+      // can't: two literally simultaneous mutual sends can no longer both
+      // pass the "nothing exists yet" check and create two opposite-
+      // direction pending rows.
+      const { data: outcome, error: rpcError } = await supabase.rpc("send_friend_request", {
+        target_id: target.id,
+      });
+      if (rpcError) {
+        switch (rpcError.message) {
+          case "self":
+            throw new Error("Você não pode enviar convite para este usuário.");
+          case "already_friends":
+            throw new Error("Vocês já são amigos.");
+          case "blocked":
+            throw new Error("Você não pode enviar convite para este usuário.");
+          case "already_pending":
+            throw new Error("Convite já enviado.");
+          default:
+            throw new Error(FRIEND_REQUEST_GENERIC_ERROR);
+        }
+      }
+      return outcome as SendFriendRequestOutcome;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["friendships", userId] }),
   });
@@ -1464,7 +1516,8 @@ export function useRespondFriendRequest(userId: string | undefined) {
           .from("friendships")
           .update({ status: "accepted" })
           .eq("user_id", otherUserId)
-          .eq("friend_id", userId!);
+          .eq("friend_id", userId!)
+          .eq("status", "pending");
         if (error) throw error;
       } else {
         const { error } = await supabase

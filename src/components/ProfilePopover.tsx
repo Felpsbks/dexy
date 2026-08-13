@@ -21,6 +21,7 @@ import {
   UserCheck,
   UserPlus,
   UserX,
+  X,
 } from "lucide-react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import {
@@ -276,7 +277,6 @@ function ProfilePopoverCard({
                   <StatusMenu userId={myId} current={manualStatus} onDone={() => setStatusMenuOpen(false)} />
                 )}
               </div>
-              <ActionRow icon={Copy} label={copied ? "Copiado!" : "Copiar ID"} onClick={copyId} done={copied} />
               {onSignOut && (
                 <>
                   <div className="my-1.5 border-t border-border/60" />
@@ -288,10 +288,22 @@ function ProfilePopoverCard({
             <>
               <ActionRow icon={MessageCircle} label="Mensagem" onClick={onMessage} />
               {myId && <FriendActionRow myId={myId} otherProfile={profile} />}
-              <ActionRow icon={Copy} label={copied ? "Copiado!" : "Copiar ID"} onClick={copyId} done={copied} />
             </>
           )}
         </div>
+
+        {/* The UUID is a technical/API-level identifier, not the public
+            identity (that's name + @handle above) -- kept available for the
+            rare case someone actually needs it (support requests, bug
+            reports), but deliberately understated instead of sitting next
+            to "Mensagem"/"Adicionar amigo" as if it were equally relevant. */}
+        <button
+          onClick={copyId}
+          className="mt-2 text-[11px] text-muted-foreground/70 hover:text-muted-foreground transition flex items-center gap-1"
+        >
+          {copied ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
+          {copied ? "ID técnico copiado" : "ID técnico · Copiar"}
+        </button>
       </div>
     </div>
   );
@@ -350,26 +362,58 @@ function FriendActionRow({ myId, otherProfile }: { myId: string; otherProfile: P
     return <ActionRow icon={Ban} label="Bloqueado" onClick={() => {}} disabled destructive />;
   }
   if (row?.status === "accepted") {
-    return <ActionRow icon={UserCheck} label="Amigos" onClick={() => {}} disabled />;
+    return (
+      <>
+        <ActionRow icon={UserCheck} label="Amigos" onClick={() => {}} disabled tone="success" />
+        <ActionRow
+          icon={UserX}
+          label="Bloquear"
+          onClick={() => blockFriendship.mutate(otherProfile.id)}
+          destructive
+        />
+      </>
+    );
   }
   if (row?.status === "pending" && row.user_id === myId) {
-    return <ActionRow icon={Clock} label="Pedido enviado" onClick={() => {}} disabled />;
+    return <ActionRow icon={Clock} label="Convite enviado" onClick={() => {}} disabled tone="warning" />;
   }
   if (row?.status === "pending" && row.user_id === otherProfile.id) {
     return (
-      <ActionRow
-        icon={UserCheck}
-        label="Aceitar pedido"
-        onClick={() => respond.mutate({ otherUserId: otherProfile.id, action: "accept" })}
-      />
+      <>
+        <div className="px-3 pt-1 pb-0.5 text-[11px] text-muted-foreground">Convite recebido</div>
+        <ActionRow
+          icon={UserCheck}
+          label="Aceitar"
+          tone="success"
+          onClick={() => respond.mutate({ otherUserId: otherProfile.id, action: "accept" })}
+          pending={respond.isPending}
+        />
+        <ActionRow
+          icon={X}
+          label="Recusar"
+          destructive
+          onClick={() => respond.mutate({ otherUserId: otherProfile.id, action: "remove" })}
+          pending={respond.isPending}
+        />
+      </>
     );
   }
+  const handleAddFriend = async () => {
+    try {
+      const outcome = await sendRequest.mutateAsync(otherProfile.handle);
+      toast.success(outcome === "auto_accepted" ? "Convite aceito ✓" : "Convite enviado ✓");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível concluir o envio agora. Tente novamente em instantes.");
+    }
+  };
+
   return (
     <>
       <ActionRow
         icon={UserPlus}
         label="Adicionar amigo"
-        onClick={() => sendRequest.mutate(otherProfile.handle)}
+        tone="info"
+        onClick={handleAddFriend}
         pending={sendRequest.isPending}
       />
       <ActionRow
@@ -382,12 +426,25 @@ function FriendActionRow({ myId, otherProfile }: { myId: string; otherProfile: P
   );
 }
 
+// Semantic status color, separate from the brand accent -- lets a relationship
+// state (waiting / actionable / confirmed / blocked) read at a glance instead
+// of every row looking equally neutral. "destructive" is kept as a boolean
+// alias for the common sign-out/block/reject case.
+const TONE_CLASSES = {
+  default: { row: "bg-white/5 hover:bg-white/10 hover:-translate-y-0.5", icon: "text-muted-foreground" },
+  info: { row: "bg-sky-400/5 hover:bg-sky-400/10 hover:-translate-y-0.5", icon: "text-sky-400" },
+  warning: { row: "bg-amber-500/5 hover:bg-amber-500/10 hover:-translate-y-0.5", icon: "text-amber-500" },
+  success: { row: "bg-primary/5 hover:bg-primary/10 hover:-translate-y-0.5", icon: "text-primary" },
+  destructive: { row: "text-destructive bg-destructive/5 hover:bg-destructive/10 hover:-translate-y-0.5", icon: "" },
+} as const;
+
 function ActionRow({
   icon: Icon,
   label,
   onClick,
   trailing,
   destructive,
+  tone = "default",
   disabled,
   pending,
   done,
@@ -397,21 +454,22 @@ function ActionRow({
   onClick: () => void;
   trailing?: ReactNode;
   destructive?: boolean;
+  tone?: keyof typeof TONE_CLASSES;
   disabled?: boolean;
   pending?: boolean;
   done?: boolean;
 }) {
+  const resolvedTone = destructive ? "destructive" : tone;
+  const { row, icon } = TONE_CLASSES[resolvedTone];
   return (
     <button
       onClick={onClick}
       disabled={disabled || pending}
-      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition duration-200 disabled:opacity-60 disabled:cursor-default ${
-        destructive
-          ? "text-destructive bg-destructive/5 hover:bg-destructive/10 hover:-translate-y-0.5"
-          : "bg-white/5 hover:bg-white/10 hover:-translate-y-0.5"
+      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition duration-200 disabled:opacity-60 disabled:cursor-default ${row} ${
+        resolvedTone === "destructive" ? "text-destructive" : ""
       }`}
     >
-      {done ? <Check className="w-4 h-4 text-primary" /> : <Icon className={`w-4 h-4 ${destructive ? "" : "text-muted-foreground"}`} />}
+      {done ? <Check className="w-4 h-4 text-primary" /> : <Icon className={`w-4 h-4 ${icon}`} />}
       <span className="flex-1 text-left">{label}</span>
       {trailing}
     </button>

@@ -859,6 +859,10 @@ export type Database = {
           already_member: boolean;
         }[];
       };
+      send_friend_request: {
+        Args: { target_id: string };
+        Returns: string;
+      };
     };
     Enums: {
       [_ in never]: never;

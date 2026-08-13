@@ -651,7 +651,10 @@ function AppPage() {
       }
       setRailMode("dm");
       setView("chat");
-    } else if (n.type === "friend_request") {
+    } else if (n.type === "friend_request" || n.type === "friend_request_accepted") {
+      // "friend_request_accepted" isn't emitted yet -- that trigger is a
+      // proposed, not-yet-applied migration (see Fase 2 report). Handled
+      // here in advance so it behaves correctly the moment it lands.
       setRailMode("dm");
       setView("chat");
     }

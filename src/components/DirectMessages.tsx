@@ -94,7 +94,7 @@ export function DmSidebar({
   const getOrCreateDm = useGetOrCreateDm();
 
   const [handleInput, setHandleInput] = useState("");
-  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendResult, setSendResult] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"conversas" | "amigos">("conversas");
 
@@ -117,16 +117,29 @@ export function DmSidebar({
 
   const handleAddFriend = async (e: FormEvent) => {
     e.preventDefault();
-    setSendError(null);
+    setSendResult(null);
     const handle = handleInput.trim();
     if (!handle) return;
     try {
-      await sendRequest.mutateAsync(handle);
+      const outcome = await sendRequest.mutateAsync(handle);
       setHandleInput("");
+      setSendResult({
+        kind: "success",
+        text: outcome === "auto_accepted" ? "Convite aceito ✓" : "Convite enviado ✓",
+      });
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : "Não foi possível enviar.");
+      setSendResult({
+        kind: "error",
+        text: err instanceof Error ? err.message : "Não foi possível concluir o envio agora. Tente novamente em instantes.",
+      });
     }
   };
+
+  useEffect(() => {
+    if (!sendResult) return;
+    const t = setTimeout(() => setSendResult(null), 4000);
+    return () => clearTimeout(t);
+  }, [sendResult]);
 
   const openWithFriend = async (friendProfile: Profile) => {
     const conversationId = await getOrCreateDm.mutateAsync(friendProfile.id);
@@ -199,7 +212,18 @@ export function DmSidebar({
                 <UserPlus className="w-4 h-4" />
               </button>
             </div>
-            {sendError && <p className="text-xs text-destructive">{sendError}</p>}
+            {sendResult && (
+              <p
+                className={`flex items-center gap-1 text-xs ${sendResult.kind === "success" ? "text-primary" : "text-destructive"}`}
+              >
+                {sendResult.kind === "success" ? (
+                  <Check className="w-3 h-3 shrink-0" />
+                ) : (
+                  <X className="w-3 h-3 shrink-0" />
+                )}
+                {sendResult.text}
+              </p>
+            )}
           </form>
 
           {incoming.length > 0 && (
@@ -216,7 +240,12 @@ export function DmSidebar({
                       className="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-secondary/50 transition duration-200"
                     >
                       <img src={avatarFor(other)} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                      <span className="text-sm truncate flex-1">{other.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm truncate">{other.name}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          Convite recebido dessa pessoa — aceitar convite
+                        </div>
+                      </div>
                       <button
                         onClick={() => respond.mutate({ otherUserId: other.id, action: "accept" })}
                         className="p-1 rounded hover:bg-secondary text-primary"

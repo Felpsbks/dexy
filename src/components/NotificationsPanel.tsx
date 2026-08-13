@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Bell, MessageCircle, UserPlus } from "lucide-react";
+import { Bell, MessageCircle, UserCheck, UserPlus } from "lucide-react";
 import type { Notification } from "@/lib/queries";
 
 function timeAgo(iso: string) {
@@ -15,6 +15,10 @@ function timeAgo(iso: string) {
 const iconFor: Record<string, typeof Bell> = {
   dm_message: MessageCircle,
   friend_request: UserPlus,
+  // Not emitted yet -- the accept-notification trigger is a proposed,
+  // not-yet-applied migration (see Fase 2 report). Mapped in advance so the
+  // icon is correct the moment it lands, instead of falling back to Bell.
+  friend_request_accepted: UserCheck,
 };
 
 export function NotificationsPanel({
