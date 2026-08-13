@@ -1429,10 +1429,14 @@ export function useSendFriendRequest(userId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (handle: string) => {
+      // Typing "@handle" (mention-style, like Twitter/Discord) is a natural
+      // instinct even though stored handles never include the "@" -- strip
+      // it so both forms find the same profile.
+      const cleanHandle = handle.trim().replace(/^@/, "");
       const { data: target, error: lookupError } = await supabase
         .from("profiles")
         .select("id")
-        .ilike("handle", handle.trim())
+        .ilike("handle", cleanHandle)
         .single();
       if (lookupError || !target) throw new Error("Usuário não encontrado.");
       if (target.id === userId) throw new Error("Você não pode adicionar a si mesmo.");

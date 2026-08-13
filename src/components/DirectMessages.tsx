@@ -179,12 +179,17 @@ export function DmSidebar({
           <form onSubmit={handleAddFriend} className="px-2 space-y-1.5">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Adicionar amigo</div>
             <div className="flex gap-1.5">
-              <input
-                value={handleInput}
-                onChange={(e) => setHandleInput(e.target.value)}
-                placeholder="handle do usuário"
-                className="flex-1 min-w-0 bg-secondary border border-border rounded-md px-2 py-1.5 text-sm outline-none focus:border-primary"
-              />
+              <div className="relative flex-1 min-w-0">
+                <span className="absolute inset-y-0 left-2 flex items-center text-sm text-muted-foreground pointer-events-none">
+                  @
+                </span>
+                <input
+                  value={handleInput}
+                  onChange={(e) => setHandleInput(e.target.value.replace(/^@/, ""))}
+                  placeholder="handle do usuário"
+                  className="w-full bg-secondary border border-border rounded-md pl-5 pr-2 py-1.5 text-sm outline-none focus:border-primary"
+                />
+              </div>
               <button
                 type="submit"
                 disabled={sendRequest.isPending || !handleInput.trim()}
