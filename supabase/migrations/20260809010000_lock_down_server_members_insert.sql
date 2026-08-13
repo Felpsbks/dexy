@@ -1,0 +1,25 @@
+-- SECURITY FIX: "users can join a server" (server_members INSERT policy,
+-- from 20260727145028_init_schema.sql) only checks `user_id = auth.uid()` —
+-- it says nothing about server_id, so any authenticated user who knows (or
+-- guesses) a server's UUID can self-insert into server_members for it via
+-- a direct API call, with zero invite/authorization check. There is no
+-- product UI that does this today, but the API allows it right now.
+--
+-- Membership creation is being moved to trusted, server-side-only paths:
+--   - New-account auto-join to the default "Dexy HQ" server, done inside
+--     handle_new_user() (SECURITY DEFINER — Supabase trigger functions run
+--     as the function owner, which has BYPASSRLS, so they are unaffected by
+--     RLS policies on the tables they touch, including this one).
+--   - Joining any other server, once that mechanism exists: a future
+--     invite RPC, also SECURITY DEFINER, that validates the invite before
+--     inserting. Not built yet — this migration only closes the current
+--     open door; it does not add a replacement client-facing INSERT path.
+--
+-- Net effect until invites ship: nobody can join any server except the
+-- default one at signup. That is intentional for this step.
+drop policy if exists "users can join a server" on public.server_members;
+
+-- SELECT, DELETE (leave / owner-kick) are untouched — this is scoped
+-- strictly to closing the unauthorized-INSERT gap. No UPDATE policy exists
+-- either before or after this migration; role assignment is a separate,
+-- later concern (Fase 5) and is intentionally left alone here.

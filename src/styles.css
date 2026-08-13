@@ -64,49 +64,83 @@
 
 :root {
   --radius: 0.75rem;
-  /* Dexy — dark first, cyan-to-lime neon accents */
-  --background: oklch(0.176 0.014 258);
-  --foreground: oklch(0.978 0.01 262);
-  --card: oklch(0.216 0.016 258);
-  --card-foreground: oklch(0.978 0.01 262);
-  --popover: oklch(0.216 0.016 258);
-  --popover-foreground: oklch(0.978 0.01 262);
-  --primary: oklch(0.814 0.145 217);
-  --primary-foreground: oklch(0.19 0.007 258);
-  --secondary: oklch(0.276 0.018 258);
-  --secondary-foreground: oklch(0.978 0.01 262);
-  --muted: oklch(0.256 0.016 258);
-  --muted-foreground: oklch(0.678 0.023 262);
-  --accent: oklch(0.897 0.249 135);
-  --accent-foreground: oklch(0.19 0.007 258);
-  --destructive: oklch(0.60 0.24 25);
-  --destructive-foreground: oklch(0.98 0.003 247);
-  --border: oklch(0.296 0.018 258);
-  --input: oklch(0.276 0.018 258);
-  --ring: oklch(0.814 0.145 217);
-  --chart-1: oklch(0.814 0.145 217);
-  --chart-2: oklch(0.897 0.249 135);
-  --chart-3: oklch(0.929 0.223 124);
-  --chart-4: oklch(0.864 0.137 207);
-  --chart-5: oklch(0.678 0.023 262);
-  --sidebar: oklch(0.146 0.012 258);
-  --sidebar-foreground: oklch(0.978 0.01 262);
-  --sidebar-primary: oklch(0.814 0.145 217);
-  --sidebar-primary-foreground: oklch(0.19 0.007 258);
-  --sidebar-accent: oklch(0.256 0.016 258);
-  --sidebar-accent-foreground: oklch(0.978 0.01 262);
-  --sidebar-border: oklch(0.256 0.016 258);
-  --sidebar-ring: oklch(0.814 0.145 217);
+  /* Dexy — petrol-blue-black premium palette (single teal accent, no lime). */
+  --background: oklch(0.103 0.017 243.7); /* #010408 */
+  --foreground: oklch(1 0 0); /* #FFFFFF */
+  --card: oklch(0.183 0.018 248.8); /* #0C131A */
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.183 0.018 248.8);
+  --popover-foreground: oklch(1 0 0);
+  --primary: oklch(0.787 0.134 184.5); /* #24D5C4 */
+  --primary-foreground: oklch(0.12 0.02 220);
+  --secondary: oklch(0.211 0.023 254.3); /* #111923 */
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(0.206 0.022 251.8); /* #101821 */
+  --muted-foreground: oklch(0.668 0.024 250.3); /* #8A96A3 */
+  --accent: oklch(0.83 0.139 184.4); /* #30E4D2 — teal hover, not lime */
+  --accent-foreground: oklch(0.12 0.02 220);
+  --destructive: oklch(0.637 0.208 25.3); /* #EF4444 */
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(1 0 0 / 5%);
+  --input: oklch(1 0 0 / 8%);
+  --ring: oklch(0.787 0.134 184.5);
+  --chart-1: oklch(0.787 0.134 184.5);
+  --chart-2: oklch(0.723 0.192 149.6);
+  --chart-3: oklch(0.83 0.139 184.4);
+  --chart-4: oklch(0.668 0.024 250.3);
+  --chart-5: oklch(0.637 0.208 25.3);
+  --sidebar: oklch(0.14 0.016 238.2); /* #040A0F */
+  --sidebar-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(0.787 0.134 184.5);
+  --sidebar-primary-foreground: oklch(0.12 0.02 220);
+  --sidebar-accent: oklch(0.211 0.023 254.3);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(1 0 0 / 5%);
+  --sidebar-ring: oklch(0.787 0.134 184.5);
   --gradient-dexy: linear-gradient(
     90deg,
-    oklch(0.814 0.145 217) 0%,
-    oklch(0.855 0.139 208) 35%,
-    oklch(0.897 0.249 135) 75%,
-    oklch(0.929 0.223 124) 100%
+    oklch(0.787 0.134 184.5) 0%,
+    oklch(0.83 0.139 184.4) 100%
   );
-  --gradient-glow: radial-gradient(ellipse at top, oklch(0.814 0.145 217 / 0.25), transparent 60%);
-  --shadow-glow: 0 0 25px oklch(0.814 0.145 217 / 0.55), 0 20px 60px -20px oklch(0.814 0.145 217 / 0.35);
-  --shadow-glow-green: 0 0 25px oklch(0.897 0.249 135 / 0.55);
+  --gradient-glow: radial-gradient(
+    ellipse at top,
+    oklch(0.787 0.134 184.5 / 0.18),
+    transparent 60%
+  );
+  --shadow-glow:
+    0 0 25px oklch(0.787 0.134 184.5 / 0.45), 0 20px 60px -20px oklch(0.787 0.134 184.5 / 0.35);
+  --shadow-glow-green: 0 0 25px oklch(0.723 0.192 149.6 / 0.55);
+}
+
+/* "Tema" (Configurações → Tema) restyles the app's accent color — "cyan" is
+   the brand default above; these two swap just the accent-driving tokens
+   (never background/card/border/destructive, which stay constant) via a
+   data-app-theme attribute set on the authenticated app shell. */
+[data-app-theme="dark"] {
+  --primary: oklch(0.82 0.015 250);
+  --primary-foreground: oklch(0.15 0.02 250);
+  --accent: oklch(0.88 0.012 250);
+  --accent-foreground: oklch(0.15 0.02 250);
+  --ring: oklch(0.82 0.015 250);
+  --sidebar-primary: oklch(0.82 0.015 250);
+  --sidebar-ring: oklch(0.82 0.015 250);
+  --gradient-dexy: linear-gradient(90deg, oklch(0.82 0.015 250) 0%, oklch(0.88 0.012 250) 100%);
+  --gradient-glow: radial-gradient(ellipse at top, oklch(0.82 0.015 250 / 0.15), transparent 60%);
+  --shadow-glow:
+    0 0 25px oklch(0.82 0.015 250 / 0.35), 0 20px 60px -20px oklch(0.82 0.015 250 / 0.25);
+}
+
+[data-app-theme="lime"] {
+  --primary: oklch(0.8 0.19 140);
+  --primary-foreground: oklch(0.14 0.02 140);
+  --accent: oklch(0.85 0.19 140);
+  --accent-foreground: oklch(0.14 0.02 140);
+  --ring: oklch(0.8 0.19 140);
+  --sidebar-primary: oklch(0.8 0.19 140);
+  --sidebar-ring: oklch(0.8 0.19 140);
+  --gradient-dexy: linear-gradient(90deg, oklch(0.8 0.19 140) 0%, oklch(0.85 0.19 140) 100%);
+  --gradient-glow: radial-gradient(ellipse at top, oklch(0.8 0.19 140 / 0.18), transparent 60%);
+  --shadow-glow: 0 0 25px oklch(0.8 0.19 140 / 0.45), 0 20px 60px -20px oklch(0.8 0.19 140 / 0.35);
 }
 
 .dark {
@@ -147,10 +181,131 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    scrollbar-width: thin;
+    scrollbar-color: oklch(1 0 0 / 0.22) transparent;
   }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: oklch(1 0 0 / 0.18);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(1 0 0 / 0.32);
+  }
+}
+
+/*
+ * DM conversation backdrop — pure CSS, no image asset. Small stars tile
+ * seamlessly every 340px (repeat), a couple of brand-colored accent stars
+ * tile every 620px, and a soft teal glow sits once near the top. Because
+ * every layer is a CSS gradient, none of it has a "runs out" height limit —
+ * background-attachment: local (set inline, ties the repeat area to the
+ * full scrollable content) makes it scroll 1:1 with the conversation no
+ * matter how long it gets. A slow opacity breathe gives a faint twinkle.
+ */
+.dm-starfield {
+  background-color: transparent;
+  background-attachment: local;
+  /* 16 small-star layers, then 3 accent-star layers, then 1 glow layer —
+     each list below has to spell out all 20 entries (not just 3 groups),
+     since CSS cycles these per-layer, not per-group. */
+  background-repeat:
+    repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat, repeat,
+    repeat, repeat, repeat, repeat, repeat, repeat, repeat, no-repeat;
+  background-size:
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    340px 340px,
+    620px 620px,
+    620px 620px,
+    620px 620px,
+    900px 700px;
+  background-position:
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    0 0,
+    50% 0;
+  background-image:
+    radial-gradient(1px 1px at 62.8% 6.3%, oklch(1 0 0 / 0.46), transparent 60%),
+    radial-gradient(1.5px 1.5px at 71.8% 66.3%, oklch(1 0 0 / 0.39), transparent 60%),
+    radial-gradient(1px 1px at 42.8% 6.7%, oklch(1 0 0 / 0.6), transparent 60%),
+    radial-gradient(1.3px 1.3px at 6.4% 22.3%, oklch(1 0 0 / 0.62), transparent 60%),
+    radial-gradient(1.4px 1.4px at 24.3% 58.2%, oklch(1 0 0 / 0.35), transparent 60%),
+    radial-gradient(1.1px 1.1px at 78.1% 68.2%, oklch(1 0 0 / 0.43), transparent 60%),
+    radial-gradient(0.9px 0.9px at 92.1% 35%, oklch(1 0 0 / 0.4), transparent 60%),
+    radial-gradient(1.4px 1.4px at 82% 59.5%, oklch(1 0 0 / 0.71), transparent 60%),
+    radial-gradient(1.1px 1.1px at 53.3% 93.5%, oklch(1 0 0 / 0.63), transparent 60%),
+    radial-gradient(1.5px 1.5px at 80.3% 60.9%, oklch(1 0 0 / 0.64), transparent 60%),
+    radial-gradient(1px 1px at 68.8% 8.2%, oklch(1 0 0 / 0.49), transparent 60%),
+    radial-gradient(0.9px 0.9px at 11.3% 25.4%, oklch(1 0 0 / 0.49), transparent 60%),
+    radial-gradient(1.1px 1.1px at 62.5% 37.6%, oklch(1 0 0 / 0.45), transparent 60%),
+    radial-gradient(1.3px 1.3px at 28.6% 90.2%, oklch(1 0 0 / 0.65), transparent 60%),
+    radial-gradient(0.9px 0.9px at 19.7% 71.1%, oklch(1 0 0 / 0.54), transparent 60%),
+    radial-gradient(1.2px 1.2px at 95% 62.9%, oklch(1 0 0 / 0.69), transparent 60%),
+    radial-gradient(2px 2px at 18% 28%, oklch(0.83 0.139 184.4 / 0.8), transparent 70%),
+    radial-gradient(1.6px 1.6px at 74% 12%, oklch(1 0.02 80 / 0.75), transparent 70%),
+    radial-gradient(2px 2px at 55% 78%, oklch(0.787 0.134 184.5 / 0.7), transparent 70%),
+    radial-gradient(ellipse 700px 500px at 50% 0%, oklch(0.787 0.134 184.5 / 0.07), transparent 70%);
+  animation: dm-twinkle 7s ease-in-out infinite alternate;
+}
+
+@keyframes dm-twinkle {
+  from {
+    opacity: 0.82;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-starfield {
+    animation: none;
   }
 }

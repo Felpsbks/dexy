@@ -1,4 +1,4 @@
-const CACHE_NAME = "dexy-static-v1";
+const CACHE_NAME = "dexy-static-v3";
 const STATIC_EXTENSIONS = [".png", ".webp", ".ico", ".svg", ".woff2", ".woff"];
 
 self.addEventListener("install", () => {
