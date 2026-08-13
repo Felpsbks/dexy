@@ -325,7 +325,7 @@ export function VoiceRoomView({
           ))}
         </div>
       </div>
-      <div className="shrink-0 flex items-center justify-center gap-3 py-4 border-t border-border">
+      <div className="shrink-0 flex items-center justify-center flex-wrap gap-2 sm:gap-3 py-4 border-t border-border">
         <ControlButton
           active={voice.micEnabled}
           onClick={voice.toggleMic}

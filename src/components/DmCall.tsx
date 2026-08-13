@@ -590,7 +590,7 @@ export function ActiveCallView({
           </div>
         )}
       </AnimatePresence>
-      <div className="flex items-center justify-center gap-3 pt-3">
+      <div className="flex items-center justify-center flex-wrap gap-2 sm:gap-3 pt-3">
         <ControlButton
           active={micEnabled}
           onClick={onToggleMic}

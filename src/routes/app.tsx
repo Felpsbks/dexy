@@ -29,6 +29,7 @@ import {
   Trash2,
   MoreHorizontal,
   Users,
+  UserRound,
   Inbox,
   Pin,
   ChevronDown,
@@ -254,6 +255,8 @@ function AppPage() {
   const [attachError, setAttachError] = useState<string | null>(null);
   const [view, setView] = useState<PanelViewExt>("chat");
   const [membersOpen, setMembersOpen] = useState(true);
+  const [dmProfileOpen, setDmProfileOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [railMode, setRailMode] = useState<"servers" | "dm">("dm");
   const [createServerOpen, setCreateServerOpen] = useState(false);
@@ -705,12 +708,28 @@ function AppPage() {
     <LinkAccountDialog open={linkAccountOpen} onOpenChange={setLinkAccountOpen} />
     <div
       data-app-theme={profile?.app_theme ?? "cyan"}
-      className="h-screen w-screen overflow-hidden bg-background text-foreground flex gap-4 p-5"
+      className="h-dvh w-screen overflow-hidden bg-background text-foreground flex gap-4 p-5"
     >
+      {/* Below md, rail + sidebar become one off-canvas drawer (fixed,
+          slides in from the left with a backdrop) instead of just
+          disappearing -- toggled by the same `mobileSidebar` state the
+          hamburger button already drives. At md+ this collapses back to
+          the exact current desktop layout: both permanently visible,
+          in normal flow, unaffected by `mobileSidebar`. */}
+      {mobileSidebar && (
+        <div
+          className="md:hidden fixed inset-0 z-30 bg-black/50"
+          onClick={() => setMobileSidebar(false)}
+        />
+      )}
       {/* Rail + channels/DM sidebar share one rounded block, no gap between them */}
-      <div className="flex bg-sidebar rounded-[18px] overflow-hidden">
+      <div
+        className={`flex bg-sidebar overflow-hidden transition-transform duration-200 ease-out fixed inset-y-0 left-0 z-40 w-[min(90vw,360px)] rounded-r-2xl md:static md:z-auto md:w-auto md:translate-x-0 md:rounded-[18px] ${
+          mobileSidebar ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         {/* Server rail */}
-        <aside className="hidden sm:flex w-[72px] shrink-0 flex-col items-center gap-2 py-3">
+        <aside className="flex w-[72px] shrink-0 flex-col items-center gap-2 py-3">
           <Link to="/" className="mb-2">
             <DexyLogo size={48} />
           </Link>
@@ -785,9 +804,7 @@ function AppPage() {
         </aside>
 
         {/* Channels sidebar */}
-        <aside
-          className={`${mobileSidebar ? "flex" : "hidden"} md:flex w-64 shrink-0 flex-col border-l border-border`}
-        >
+        <aside className="flex flex-1 min-w-0 md:w-64 md:flex-none shrink-0 flex-col border-l border-border">
           {railMode === "dm" ? (
             <>
               <div className="h-14 px-4 flex items-center border-b border-border shadow-sm">
@@ -809,6 +826,7 @@ function AppPage() {
                     setActiveDmProfile(otherProfile);
                     setView("chat");
                     setMobileSidebar(false);
+                    setDmProfileOpen(false);
                   }}
                 />
               </Suspense>
@@ -1053,11 +1071,65 @@ function AppPage() {
                       )}
                     </AnimatePresence>
                   </div>
+                  {/* Below sm the always-visible search box has nowhere to
+                      go -- collapses to an icon that opens a full-width
+                      overlay bar instead of just disappearing. */}
+                  <IconBtn
+                    icon={Search}
+                    onClick={() => setMobileSearchOpen((v) => !v)}
+                    className="sm:hidden"
+                  />
                   <IconBtn icon={Users} onClick={() => setMembersOpen((v) => !v)} />
                 </>
               )}
+              {railMode === "dm" && activeConversationId && (
+                <IconBtn
+                  icon={UserRound}
+                  onClick={() => setDmProfileOpen((v) => !v)}
+                  className="lg:hidden"
+                />
+              )}
             </div>
           </div>
+
+          {mobileSearchOpen && (
+            <div className="sm:hidden px-3 py-2 border-b border-border bg-card">
+              <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-md text-sm">
+                <Search className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                <input
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-muted-foreground"
+                  placeholder="Buscar"
+                />
+                <button
+                  onClick={() => {
+                    setMobileSearchOpen(false);
+                    setSearchQuery("");
+                  }}
+                  className="shrink-0 text-muted-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="relative">
+                <AnimatePresence>
+                  {searchQuery.trim().length >= 2 && (
+                    <SearchResultsPanel
+                      results={searchResults}
+                      loading={searching}
+                      onSelect={(r) => {
+                        handleSearchSelect(r);
+                        setMobileSearchOpen(false);
+                      }}
+                      onClose={() => setSearchQuery("")}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 flex min-h-0">
             <section className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -1189,6 +1261,7 @@ function AppPage() {
               setKickingMember(member);
               setKickMemberOpen(true);
             }}
+            onClose={() => setMembersOpen(false)}
           />
         )}
         {view === "chat" && railMode === "dm" && activeConversationId && activeDmProfile && (
@@ -1199,6 +1272,8 @@ function AppPage() {
             call={dmCall.call?.conversation_id === activeConversationId ? dmCall : null}
             deafened={deafened}
             onToggleDeafen={() => setDeafened((v) => !v)}
+            mobileOpen={dmProfileOpen}
+            onCloseMobile={() => setDmProfileOpen(false)}
           />
         )}
       </main>
@@ -2495,7 +2570,7 @@ function NoServersScreen({ onCreated }: { onCreated: (server: Server) => void })
   };
 
   return (
-    <div className="h-screen w-screen grid place-items-center bg-background text-foreground px-4">
+    <div className="h-dvh w-screen grid place-items-center bg-background text-foreground px-4">
       <div className="flex flex-col items-center gap-4 text-center max-w-sm w-full">
         <DexyLogo size={40} />
         <div>
@@ -2532,7 +2607,7 @@ function NoServersScreen({ onCreated }: { onCreated: (server: Server) => void })
 
 function LoadingScreen() {
   return (
-    <div className="h-screen w-screen grid place-items-center bg-background text-foreground">
+    <div className="h-dvh w-screen grid place-items-center bg-background text-foreground">
       <div className="flex flex-col items-center gap-3">
         <DexyLogo size={40} />
         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -2546,9 +2621,17 @@ function ChannelIconInline({ type }: { type: ChannelType }) {
   return <Icon className="w-5 h-5 text-muted-foreground" />;
 }
 
-function IconBtn({ icon: Icon, onClick }: { icon: typeof Bell; onClick?: () => void }) {
+function IconBtn({
+  icon: Icon,
+  onClick,
+  className = "",
+}: {
+  icon: typeof Bell;
+  onClick?: () => void;
+  className?: string;
+}) {
   return (
-    <button onClick={onClick} className="p-2 rounded hover:bg-secondary transition">
+    <button onClick={onClick} className={`p-2 rounded hover:bg-secondary transition ${className}`}>
       <Icon className="w-4 h-4" />
     </button>
   );
@@ -3081,7 +3164,7 @@ function Composer({
         />
         <label
           htmlFor={fileInputId}
-          className="p-2 rounded-full hover:bg-background text-muted-foreground cursor-pointer"
+          className="p-2.5 rounded-full hover:bg-background text-muted-foreground cursor-pointer shrink-0"
         >
           <Paperclip className="w-4 h-4" />
         </label>
@@ -3096,18 +3179,18 @@ function Composer({
             }
           }}
           placeholder={`Enviar mensagem em #${channelName}`}
-          className="flex-1 bg-transparent outline-none resize-none py-2 max-h-40"
+          className="flex-1 min-w-0 bg-transparent outline-none resize-none py-2.5 max-h-40"
         />
-        <button className="p-2 rounded-full hover:bg-background text-muted-foreground">
+        <button className="p-2.5 rounded-full hover:bg-background text-muted-foreground shrink-0">
           <Gift className="w-4 h-4" />
         </button>
-        <button className="p-2 rounded-full hover:bg-background text-muted-foreground">
+        <button className="p-2.5 rounded-full hover:bg-background text-muted-foreground shrink-0">
           <Smile className="w-4 h-4" />
         </button>
         <button
           onClick={onSend}
           disabled={(!value.trim() && !pendingFile) || sending}
-          className="p-2 rounded-full text-primary-foreground disabled:opacity-40 transition"
+          className="p-2.5 rounded-full text-primary-foreground disabled:opacity-40 transition shrink-0"
           style={{ backgroundImage: "var(--gradient-dexy)" }}
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -3126,6 +3209,7 @@ function MembersPanel({
   myId,
   onAssignRole,
   onKick,
+  onClose,
 }: {
   members: MemberWithProfile[];
   roles: ServerRole[];
@@ -3135,6 +3219,7 @@ function MembersPanel({
   myId: string | undefined;
   onAssignRole: (member: MemberWithProfile, roleId: string | null) => void;
   onKick: (member: MemberWithProfile) => void;
+  onClose: () => void;
 }) {
   const { open } = useProfilePopover();
   const onlineIds = useOnlineUserIds();
@@ -3158,8 +3243,19 @@ function MembersPanel({
     ["offline", "Offline"],
   ];
   return (
-    <aside className="hidden lg:flex w-64 shrink-0 flex-col bg-sidebar rounded-[18px] overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-3 space-y-4">
+    <>
+      <div
+        className="lg:hidden fixed inset-0 z-30 bg-black/50"
+        onClick={onClose}
+      />
+      <aside className="fixed inset-y-0 right-0 z-40 w-[min(85vw,320px)] rounded-l-2xl animate-in slide-in-from-right-4 fade-in duration-200 lg:static lg:z-auto lg:w-64 lg:rounded-[18px] lg:animate-none shrink-0 flex flex-col bg-sidebar overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border lg:hidden">
+          <span className="text-sm font-semibold">Membros</span>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-secondary text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {labels.map(([s, l]) => {
           const list = grouped[s];
           if (!list.length) return null;
@@ -3270,7 +3366,8 @@ function MembersPanel({
           );
         })}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 

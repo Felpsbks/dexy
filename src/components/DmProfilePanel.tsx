@@ -39,6 +39,8 @@ export function DmProfilePanel({
   deafened,
   onToggleDeafen,
   onClose,
+  mobileOpen,
+  onCloseMobile,
 }: {
   profile: Profile;
   myId?: string;
@@ -47,6 +49,11 @@ export function DmProfilePanel({
   deafened?: boolean;
   onToggleDeafen?: () => void;
   onClose?: () => void;
+  // Below `lg` this panel is normally off-canvas (it's always visible at
+  // `lg`+, same as before) -- these two make it a toggleable drawer
+  // instead of just permanently hidden on small screens.
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }) {
   const isOnline = useIsUserOnline(profile.id);
   const status = resolvePresenceStatus(profile.status as UserStatus, isOnline);
@@ -80,17 +87,28 @@ export function DmProfilePanel({
         elapsedMs={callElapsedMs}
         deafened={!!deafened}
         onToggleDeafen={onToggleDeafen}
+        mobileOpen={mobileOpen}
+        onCloseMobile={onCloseMobile}
       />
     );
   }
 
   return (
-    <motion.aside
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 24 }}
-      transition={{ duration: 0.2, ease: "easeInOut" }}
-      className="hidden lg:flex w-72 shrink-0 flex-col bg-sidebar rounded-[18px] overflow-y-auto"
+    <>
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-30 bg-black/50"
+          onClick={onCloseMobile}
+        />
+      )}
+      <motion.aside
+        initial={{ opacity: 0, x: 24 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 24 }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
+        className={`flex w-[min(85vw,320px)] shrink-0 flex-col bg-sidebar rounded-l-2xl overflow-y-auto fixed inset-y-0 right-0 z-40 transition-transform duration-200 lg:static lg:z-auto lg:w-72 lg:rounded-[18px] lg:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "translate-x-full"
+        }`}
     >
       <div className="relative">
         <div
@@ -186,7 +204,8 @@ export function DmProfilePanel({
           )}
         </div>
       </div>
-    </motion.aside>
+      </motion.aside>
+    </>
   );
 }
 
@@ -202,6 +221,8 @@ function CallSidePanel({
   elapsedMs,
   deafened,
   onToggleDeafen,
+  mobileOpen,
+  onCloseMobile,
 }: {
   profile: Profile;
   myProfile?: Profile;
@@ -209,6 +230,8 @@ function CallSidePanel({
   elapsedMs: number;
   deafened: boolean;
   onToggleDeafen?: () => void;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }) {
   const profileFor = (identity: string) =>
     (identity === myProfile?.id ? myProfile : profile) ?? profile;
@@ -217,13 +240,22 @@ function CallSidePanel({
   // panel above, which can show someone who isn't in a call at all).
 
   return (
-    <motion.aside
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 24 }}
-      transition={{ duration: 0.2, ease: "easeInOut" }}
-      className="hidden lg:flex w-72 shrink-0 flex-col bg-sidebar rounded-[18px] overflow-y-auto"
-    >
+    <>
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-30 bg-black/50"
+          onClick={onCloseMobile}
+        />
+      )}
+      <motion.aside
+        initial={{ opacity: 0, x: 24 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 24 }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
+        className={`flex w-[min(85vw,320px)] shrink-0 flex-col bg-sidebar rounded-l-2xl overflow-y-auto fixed inset-y-0 right-0 z-40 transition-transform duration-200 lg:static lg:z-auto lg:w-72 lg:rounded-[18px] lg:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
       <div
         className="h-16 px-5 flex items-center gap-2 text-sm font-semibold shrink-0"
         style={{ backgroundImage: "var(--gradient-dexy)", color: "oklch(0.12 0.02 220)" }}
@@ -334,6 +366,7 @@ function CallSidePanel({
           Sair da chamada
         </button>
       </div>
-    </motion.aside>
+      </motion.aside>
+    </>
   );
 }

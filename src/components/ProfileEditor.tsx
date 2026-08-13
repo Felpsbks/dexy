@@ -742,8 +742,8 @@ export function ProfileEditor({
 
       {/* Delete account confirmation dialog */}
       {showDeleteDialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-card border border-border p-6 shadow-2xl mx-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md max-h-[85dvh] overflow-y-auto rounded-2xl bg-card border border-border p-6 shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-destructive/15 grid place-items-center">
                 <AlertTriangle className="w-5 h-5 text-destructive" />

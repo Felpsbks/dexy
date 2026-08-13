@@ -28,7 +28,7 @@ export function DisplayNameStep({
   const initial = trimmed.slice(0, 1).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#05070d] text-white relative overflow-hidden flex flex-col items-center justify-center px-6">
+    <div className="min-h-dvh bg-[#05070d] text-white relative overflow-hidden flex flex-col items-center justify-center px-6">
       <div className="absolute inset-0 dm-starfield" />
       <div
         className="absolute inset-0 pointer-events-none"

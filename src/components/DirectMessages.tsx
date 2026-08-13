@@ -729,7 +729,7 @@ export function DmChatView({
             />
             <label
               htmlFor="dm-composer-file-input"
-              className={`p-2 rounded-full text-muted-foreground transition ${isBlocked ? "opacity-30 pointer-events-none" : "hover:bg-background cursor-pointer"}`}
+              className={`p-2.5 rounded-full text-muted-foreground transition shrink-0 ${isBlocked ? "opacity-30 pointer-events-none" : "hover:bg-background cursor-pointer"}`}
             >
               <Paperclip className="w-4 h-4" />
             </label>
