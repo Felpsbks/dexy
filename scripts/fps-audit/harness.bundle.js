@@ -29850,6 +29850,15 @@
     await room.localParticipant.setCameraEnabled(true, opts, publishOptions);
     return true;
   }
+  async function publishRawTrack(mediaStreamTrack, encoding, videoCodec) {
+    await room.localParticipant.publishTrack(mediaStreamTrack, {
+      videoEncoding: encoding,
+      simulcast: false,
+      source: Track.Source.ScreenShare,
+      ...videoCodec ? { videoCodec } : {}
+    });
+    return true;
+  }
   async function publishScreenShare(opts) {
     const captureOptions = {
       audio: false,
@@ -29934,6 +29943,7 @@
     connect,
     publishCamera,
     publishScreenShare,
+    publishRawTrack,
     getLocalTrackSettings,
     getRenderStats,
     disconnectAll,

@@ -1,0 +1,10 @@
+{
+  "name": "fps-audit-export",
+  "private": true,
+  "type": "module",
+  "description": "Teste isolado de FPS/qualidade de screen share via WebRTC/LiveKit -- não acessa Supabase nem o resto do app Dexy.",
+  "dependencies": {
+    "playwright": "^1.62.1",
+    "livekit-server-sdk": "^2.17.0"
+  }
+}

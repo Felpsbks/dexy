@@ -56,6 +56,21 @@ async function publishCamera(resolution, publishOptions) {
   return true;
 }
 
+// Publishes a MediaStreamTrack the caller already captured itself (e.g. raw
+// getDisplayMedia outside the harness), instead of creating a fresh one --
+// lets the same exact track be measured raw (requestVideoFrameCallback) and
+// through LiveKit's encode/publish pipeline at the same time, isolating
+// Capture from Encode with no "different capture instance" confound.
+async function publishRawTrack(mediaStreamTrack, encoding, videoCodec) {
+  await room.localParticipant.publishTrack(mediaStreamTrack, {
+    videoEncoding: encoding,
+    simulcast: false,
+    source: Track.Source.ScreenShare,
+    ...(videoCodec ? { videoCodec } : {}),
+  });
+  return true;
+}
+
 async function publishScreenShare(opts) {
   const captureOptions = {
     audio: false,
@@ -150,6 +165,7 @@ window.__harness = {
   connect,
   publishCamera,
   publishScreenShare,
+  publishRawTrack,
   getLocalTrackSettings,
   getRenderStats,
   disconnectAll,

@@ -1,0 +1,30 @@
+[
+  {
+    "scenario": {
+      "id": "1080p60_mstp",
+      "label": "1080p60 -- MediaStreamTrackProcessor lendo a mesma track (candidato a pipeline WebCodecs)",
+      "resolution": {
+        "width": 1920,
+        "height": 1080,
+        "frameRate": 60
+      },
+      "encoding": {
+        "maxBitrate": 8000000,
+        "maxFramerate": 60
+      }
+    },
+    "deviceId": "web-contents-media-stream://5:8",
+    "displaySurface": "browser",
+    "rawFpsBaseline": 59.9880023994903,
+    "mstpSupported": true,
+    "mstpFpsBaseline": 59.9880023994903,
+    "mstpFpsWhilePublishing": 14.975455166842726,
+    "rawFpsWhilePublishing": 14.975455166842726,
+    "encodeFps": 15.054679732992472,
+    "decodeFps": 14.983667092742508,
+    "resSent": "1920x1080",
+    "bitrateKbps": 2181.446953557733,
+    "qualityLimitationReason": "none",
+    "packetsLost": 0
+  }
+]

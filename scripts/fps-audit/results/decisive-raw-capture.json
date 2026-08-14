@@ -1,0 +1,230 @@
+[
+  {
+    "scenario": {
+      "id": "720p60",
+      "label": "720p, frameRate 60 solicitado — captura bruta (sem WebRTC)",
+      "resolution": {
+        "width": 1280,
+        "height": 720,
+        "frameRate": 60
+      }
+    },
+    "result": {
+      "settings": {
+        "aspectRatio": 1.7777777777777777,
+        "cursor": "motion",
+        "deviceId": "web-contents-media-stream://5:8",
+        "displaySurface": "browser",
+        "frameRate": 60,
+        "height": 720,
+        "logicalSurface": true,
+        "resizeMode": "crop-and-scale",
+        "width": 1280
+      },
+      "capabilities": {
+        "aspectRatio": {
+          "max": 1280,
+          "min": 0.001388888888888889
+        },
+        "deviceId": "web-contents-media-stream://5:8",
+        "displaySurface": "browser",
+        "facingMode": [],
+        "frameRate": {
+          "max": 60,
+          "min": 0
+        },
+        "height": {
+          "max": 720,
+          "min": 1
+        },
+        "resizeMode": [
+          "none",
+          "crop-and-scale"
+        ],
+        "width": {
+          "max": 1280,
+          "min": 1
+        }
+      },
+      "constraints": {
+        "frameRate": 60,
+        "height": 720,
+        "width": 1280
+      },
+      "rawFpsBeforePublish": 60.103963612646005,
+      "rawFpsSecondWindow": 59.98800239956478,
+      "rawFrameTotal": 1019
+    }
+  },
+  {
+    "scenario": {
+      "id": "1080p60",
+      "label": "1080p, frameRate 60 solicitado — captura bruta (sem WebRTC)",
+      "resolution": {
+        "width": 1920,
+        "height": 1080,
+        "frameRate": 60
+      }
+    },
+    "result": {
+      "settings": {
+        "aspectRatio": 1.7777777777777777,
+        "cursor": "motion",
+        "deviceId": "web-contents-media-stream://5:8",
+        "displaySurface": "browser",
+        "frameRate": 60,
+        "height": 1080,
+        "logicalSurface": true,
+        "resizeMode": "crop-and-scale",
+        "width": 1920
+      },
+      "capabilities": {
+        "aspectRatio": {
+          "max": 1280,
+          "min": 0.001388888888888889
+        },
+        "deviceId": "web-contents-media-stream://5:8",
+        "displaySurface": "browser",
+        "facingMode": [],
+        "frameRate": {
+          "max": 60,
+          "min": 0
+        },
+        "height": {
+          "max": 720,
+          "min": 1
+        },
+        "resizeMode": [
+          "none",
+          "crop-and-scale"
+        ],
+        "width": {
+          "max": 1280,
+          "min": 1
+        }
+      },
+      "constraints": {
+        "frameRate": 60,
+        "height": 1080,
+        "width": 1920
+      },
+      "rawFpsBeforePublish": 60.079189617849245,
+      "rawFpsSecondWindow": 59.95728043766583,
+      "rawFrameTotal": 1017
+    }
+  },
+  {
+    "scenario": {
+      "id": "720p120",
+      "label": "720p, frameRate 120 solicitado — captura bruta (sem WebRTC)",
+      "resolution": {
+        "width": 1280,
+        "height": 720,
+        "frameRate": 120
+      }
+    },
+    "result": {
+      "settings": {
+        "aspectRatio": 1.7777777777777777,
+        "cursor": "motion",
+        "deviceId": "web-contents-media-stream://5:8",
+        "displaySurface": "browser",
+        "frameRate": 120,
+        "height": 720,
+        "logicalSurface": true,
+        "resizeMode": "crop-and-scale",
+        "width": 1280
+      },
+      "capabilities": {
+        "aspectRatio": {
+          "max": 1280,
+          "min": 0.001388888888888889
+        },
+        "deviceId": "web-contents-media-stream://5:8",
+        "displaySurface": "browser",
+        "facingMode": [],
+        "frameRate": {
+          "max": 120,
+          "min": 0
+        },
+        "height": {
+          "max": 720,
+          "min": 1
+        },
+        "resizeMode": [
+          "none",
+          "crop-and-scale"
+        ],
+        "width": {
+          "max": 1280,
+          "min": 1
+        }
+      },
+      "constraints": {
+        "frameRate": 120,
+        "height": 720,
+        "width": 1280
+      },
+      "rawFpsBeforePublish": 113.17078045376668,
+      "rawFpsSecondWindow": 108.79476386157104,
+      "rawFrameTotal": 1886
+    }
+  },
+  {
+    "scenario": {
+      "id": "1080p120",
+      "label": "1080p, frameRate 120 solicitado — captura bruta (sem WebRTC)",
+      "resolution": {
+        "width": 1920,
+        "height": 1080,
+        "frameRate": 120
+      }
+    },
+    "result": {
+      "settings": {
+        "aspectRatio": 1.7777777777777777,
+        "cursor": "motion",
+        "deviceId": "web-contents-media-stream://5:8",
+        "displaySurface": "browser",
+        "frameRate": 120,
+        "height": 1080,
+        "logicalSurface": true,
+        "resizeMode": "crop-and-scale",
+        "width": 1920
+      },
+      "capabilities": {
+        "aspectRatio": {
+          "max": 1280,
+          "min": 0.001388888888888889
+        },
+        "deviceId": "web-contents-media-stream://5:8",
+        "displaySurface": "browser",
+        "facingMode": [],
+        "frameRate": {
+          "max": 120,
+          "min": 0
+        },
+        "height": {
+          "max": 720,
+          "min": 1
+        },
+        "resizeMode": [
+          "none",
+          "crop-and-scale"
+        ],
+        "width": {
+          "max": 1280,
+          "min": 1
+        }
+      },
+      "constraints": {
+        "frameRate": 120,
+        "height": 1080,
+        "width": 1920
+      },
+      "rawFpsBeforePublish": 116.44759858072544,
+      "rawFpsSecondWindow": 112.98870112992911,
+      "rawFrameTotal": 1943
+    }
+  }
+]

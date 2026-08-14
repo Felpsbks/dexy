@@ -25,7 +25,17 @@ function loadEnv(file) {
   }
   return out;
 }
-const env = loadEnv(path.join(ROOT, ".env"));
+// Local .env (this dir) takes priority -- lets this folder run fully
+// standalone when copied out of the repo (e.g. to a second test machine,
+// see README.md), without needing the full app checkout or its Supabase
+// credentials. Falls back to the app's own .env two levels up otherwise.
+let envPath = path.join(__dirname, ".env");
+try {
+  readFileSync(envPath);
+} catch {
+  envPath = path.join(ROOT, ".env");
+}
+const env = loadEnv(envPath);
 const LIVEKIT_URL = env.VITE_LIVEKIT_URL;
 const LIVEKIT_API_KEY = env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = env.LIVEKIT_API_SECRET;
@@ -364,10 +374,16 @@ async function runScenario(scenario, { windowSourceBrowser } = {}) {
     pubArgs.push(`--auto-select-desktop-capture-source=${scenario.captureSourceTitle}`);
   }
 
-  const pubBrowser = await chromium.launch({ headless: false, args: pubArgs });
+  // FPS_AUDIT_REAL_CHROME=1 launches the actual installed Chrome
+  // (channel: "chrome") instead of Playwright's bundled Chrome-for-Testing
+  // build -- isolates "different Chrome build" as a variable, independent of
+  // needing different hardware.
+  const channelOpt = process.env.FPS_AUDIT_REAL_CHROME ? { channel: "chrome" } : {};
+  const pubBrowser = await chromium.launch({ headless: false, args: pubArgs, ...channelOpt });
   const subBrowser = await chromium.launch({
     headless: false,
     args: ["--autoplay-policy=no-user-gesture-required", "--window-size=640,480", "--window-position=900,0"],
+    ...channelOpt,
   });
 
   const result = { scenario: { id: scenario.id, label: scenario.label, resolution: scenario.resolution, encoding: scenario.encoding }, samples: [], error: null };
@@ -527,7 +543,11 @@ async function main() {
 
   let windowSourceBrowser = null;
   if (which === "all" || which === "mode" || which === "compare") {
-    windowSourceBrowser = await chromium.launch({ headless: false, args: ["--window-size=1920,1080", "--window-position=0,0"] });
+    windowSourceBrowser = await chromium.launch({
+      headless: false,
+      args: ["--window-size=1920,1080", "--window-position=0,0"],
+      ...(process.env.FPS_AUDIT_REAL_CHROME ? { channel: "chrome" } : {}),
+    });
   }
 
   const scenarioSets = [];
