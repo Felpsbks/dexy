@@ -8,8 +8,11 @@ import {
   Room,
   RoomEvent,
   Track,
+  VideoPreset,
   type AudioCaptureOptions,
   type RemoteParticipant,
+  type TrackPublishOptions,
+  type VideoCaptureOptions,
 } from "livekit-client";
 
 // LiveKit's own Room default (AudioPresets.music, 48kbps) already beats the
@@ -21,6 +24,44 @@ import { mintDmVoiceToken, mintVoiceToken } from "./livekit-token";
 import { supabase } from "./supabase";
 import type { Database } from "./database.types";
 
+// Fase 7.6: setCameraEnabled() with no options at all (the previous code on
+// every call site below) leaves resolution AND encoding entirely to
+// livekit-client's built-in defaults -- 1280x720 capture, and no explicit
+// videoEncoding means the SDK auto-picks one of its built-in VideoPresets by
+// matching resolution. Measured on real LiveKit Cloud infra with getStats():
+// none of those built-in presets exceed 30fps, so even a 1080p/60 *capture*
+// (confirmed genuinely 60fps at the track's own getSettings()) still got
+// encoded/sent/rendered at ~30fps with qualityLimitationReason "none" --
+// not a CPU/bandwidth limit, just the preset lookup silently capping
+// maxFramerate. An explicit videoEncoding bypasses that lookup entirely.
+//
+// Resolution stays a plain (non-"exact") constraint -- see
+// VideoCaptureOptions/ConstrainDOMString semantics -- so a camera that can't
+// do 1080p degrades to whatever it actually supports (e.g. 720p) instead of
+// throwing OverconstrainedError; that's the fallback path, no separate probe
+// needed. 1080p/30 measured ~3Mbps with zero packet loss and no quality
+// limitation on real infra, well inside typical headroom.
+const CAMERA_CAPTURE_OPTIONS: VideoCaptureOptions = {
+  resolution: { width: 1920, height: 1080, frameRate: 30 },
+};
+const CAMERA_PUBLISH_OPTIONS: TrackPublishOptions = {
+  videoEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 },
+  // livekit-client's own default low simulcast layers (used whenever
+  // videoSimulcastLayers isn't set) ship at 20fps -- reasonable for saving
+  // bandwidth on a small grid tile, but the framerate drop reads as stutter,
+  // not just softness (confirmed: a small receiving tile measured ~20fps at
+  // 320x180 against the same 30fps source, vs 30fps when the tile is large
+  // enough to pull the top layer). Same bitrates/resolutions as the SDK
+  // defaults -- adaptiveStream still requests a smaller layer for a small
+  // tile and still saves the same bandwidth -- just framerate raised to
+  // match the top layer so a small tile trades resolution for bandwidth,
+  // not motion smoothness too.
+  videoSimulcastLayers: [
+    new VideoPreset(320, 180, 160_000, 30),
+    new VideoPreset(640, 360, 450_000, 30),
+  ],
+};
+
 // Forces the browser's own echo cancellation / noise suppression / auto gain
 // on every mic capture — relying on browser defaults isn't reliable across
 // Chrome/Firefox/Safari, and this is most of what makes Discord's voice
@@ -30,6 +71,31 @@ const MIC_CAPTURE_OPTIONS: AudioCaptureOptions = {
   noiseSuppression: true,
   autoGainControl: true,
 };
+
+// getUserMedia/getDisplayMedia reject with a DOMException whose .name is one
+// of a small fixed set — the raw .message is browser-specific engineering
+// text ("Permission denied", "Could not start video source", ...) that means
+// nothing to a non-technical user. Returns null for anything that isn't a
+// recognized device-access DOMException, so callers can fall back to
+// whatever generic handling they already had for non-media errors.
+function friendlyMediaError(err: unknown, kind: "mic" | "camera"): string | null {
+  const name = err instanceof DOMException ? err.name : undefined;
+  const device = kind === "mic" ? "microfone" : "câmera";
+  switch (name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return `Permissão de ${device} negada. Habilite o acesso ao ${device} nas configurações do navegador e tente novamente.`;
+    case "NotFoundError":
+      return `Nenhum(a) ${device} encontrado(a). Verifique se o dispositivo está conectado.`;
+    case "NotReadableError":
+      return `Não foi possível acessar seu(sua) ${device} — ele(a) pode estar sendo usado(a) por outro aplicativo.`;
+    case "OverconstrainedError":
+    case "AbortError":
+      return `Não foi possível acessar seu(sua) ${device}. Tente novamente em instantes.`;
+    default:
+      return name ? `Não foi possível acessar seu(sua) ${device}.` : null;
+  }
+}
 
 // ActiveSpeakersChanged fires far more often than the other room events
 // (every audio-level sample change while anyone talks) — forwarding every
@@ -65,12 +131,14 @@ export type ParticipantInfo = {
   micMuted: boolean;
   cameraTrack: Track | undefined;
   screenShareTrack: Track | undefined;
+  screenShareAudioTrack: Track | undefined;
 };
 
 function toInfo(p: Participant): ParticipantInfo {
   const mic = p.getTrackPublication(Track.Source.Microphone);
   const camera = p.getTrackPublication(Track.Source.Camera);
   const screen = p.getTrackPublication(Track.Source.ScreenShare);
+  const screenAudio = p.getTrackPublication(Track.Source.ScreenShareAudio);
   return {
     identity: p.identity,
     name: p.name || p.identity,
@@ -80,6 +148,13 @@ function toInfo(p: Participant): ParticipantInfo {
     micMuted: !mic || mic.isMuted,
     cameraTrack: camera?.track,
     screenShareTrack: screen?.track,
+    // Published as its own separate source by setScreenShareEnabled(true,
+    // { audio: true }, ...) whenever the browser/OS includes tab or system
+    // audio in the share -- distinct from the sharer's microphone track,
+    // and previously never read here, so no remote <TrackAudio> ever had
+    // anything to attach to (the audio was published but nothing on the
+    // receiving end ever played it).
+    screenShareAudioTrack: screenAudio?.track,
   };
 }
 
@@ -104,11 +179,58 @@ export const SCREEN_SHARE_QUALITIES = {
 } as const;
 export type ScreenShareQuality = keyof typeof SCREEN_SHARE_QUALITIES;
 
+// LiveKit's publication state doesn't reliably follow the underlying
+// MediaStreamTrack when it ends on its own -- confirmed empirically:
+// clicking the browser's own "Stop sharing" bar (functionally identical to
+// calling track.stop() directly) left isScreenShareEnabled/the publication
+// stuck "on" with no RoomEvent firing to correct it. This watches the raw
+// track(s) directly so the browser closing/revoking the capture (native stop
+// button, closing the shared tab/window, OS yanking permission) is always
+// caught, not just app-initiated stops.
+function watchScreenShareEnded(room: Room, onEnded: () => void) {
+  const lp = room.localParticipant;
+  const videoTrack = lp.getTrackPublication(Track.Source.ScreenShare)?.track;
+  const audioTrack = lp.getTrackPublication(Track.Source.ScreenShareAudio)?.track;
+  for (const track of [videoTrack, audioTrack]) {
+    const mst = track?.mediaStreamTrack;
+    if (!mst || !track) continue;
+    const source = track.source;
+    mst.addEventListener(
+      "ended",
+      () => {
+        // Guard against the swap path below: unpublishing the old track
+        // there also stops it, which would otherwise fire this same
+        // "ended" handler for a track that was *intentionally* replaced,
+        // not one that died on its own -- only react if this exact
+        // MediaStreamTrack is still the one currently published for its
+        // source at the moment the event actually arrives.
+        const current = lp.getTrackPublication(source)?.track?.mediaStreamTrack;
+        if (current !== mst) return;
+        (async () => {
+          try {
+            if (lp.isScreenShareEnabled) {
+              await lp.setScreenShareEnabled(false);
+            }
+          } catch {
+            // already unpublished/torn down by something else -- nothing left to do
+          }
+          onEnded();
+        })();
+      },
+      { once: true },
+    );
+  }
+}
+
 // Clicking "share screen" while already sharing picks a *different* source
 // instead of stopping — the new capture is grabbed before anything is torn
 // down, so cancelling the picker leaves the current share running untouched.
 // Actually stopping is a separate, unambiguous action (see stopScreenShare).
-async function swapOrStartScreenShare(room: Room, quality: ScreenShareQuality = "1080p") {
+async function swapOrStartScreenShare(
+  room: Room,
+  quality: ScreenShareQuality = "1080p",
+  onEnded?: () => void,
+) {
   const preset = SCREEN_SHARE_QUALITIES[quality];
   const captureOptions = {
     audio: true,
@@ -125,6 +247,7 @@ async function swapOrStartScreenShare(room: Room, quality: ScreenShareQuality = 
   const lp = room.localParticipant;
   if (!lp.isScreenShareEnabled) {
     await lp.setScreenShareEnabled(true, captureOptions, publishOptions);
+    if (onEnded) watchScreenShareEnded(room, onEnded);
     return;
   }
   const newTracks = await createLocalScreenTracks(captureOptions);
@@ -135,6 +258,7 @@ async function swapOrStartScreenShare(room: Room, quality: ScreenShareQuality = 
   for (const track of newTracks) {
     await lp.publishTrack(track, track.source === Track.Source.ScreenShare ? publishOptions : undefined);
   }
+  if (onEnded) watchScreenShareEnded(room, onEnded);
 }
 
 async function stopScreenShare(room: Room) {
@@ -168,6 +292,12 @@ function disconnectReasonLabel(reason: DisconnectReason | undefined): string {
 export interface VoiceRoomHook {
   status: VoiceRoomStatus;
   error: string | null;
+  // Non-fatal: a mic/camera device failure while already connected (a
+  // toggle rejected, e.g. permission revoked mid-call) or a camera that
+  // failed to start. Unlike `error`, this never ends the call -- audio
+  // keeps working, it just tells the user why video/mic didn't do what
+  // they expected instead of leaving the UI silently wrong.
+  mediaError: string | null;
   reconnecting: boolean;
   participants: ParticipantInfo[];
   micEnabled: boolean;
@@ -195,6 +325,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
   const micPrefRef = useRef(true);
   const [status, setStatus] = useState<VoiceRoomStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
 
@@ -320,7 +451,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
       setStatus("connected");
     } catch (err) {
       setStatus("error");
-      setError(err instanceof Error ? err.message : "Não foi possível entrar na sala.");
+      setError(friendlyMediaError(err, "mic") ?? (err instanceof Error ? err.message : "Não foi possível entrar na sala."));
     }
   }, [channelId, connectRoom]);
 
@@ -337,8 +468,18 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     const room = roomRef.current;
     if (!room) return;
     const enabled = room.localParticipant.isMicrophoneEnabled;
-    micPrefRef.current = !enabled;
-    await room.localParticipant.setMicrophoneEnabled(!enabled, MIC_CAPTURE_OPTIONS);
+    try {
+      await room.localParticipant.setMicrophoneEnabled(!enabled, MIC_CAPTURE_OPTIONS);
+      // Only remember the new preference (and clear any earlier error) once
+      // the SDK call actually succeeded -- previously this ran unconditionally
+      // before the await even settled, so a rejected toggle (permission
+      // revoked mid-call, device unplugged) still left the UI/preference
+      // believing it had worked.
+      micPrefRef.current = !enabled;
+      setMediaError(null);
+    } catch (err) {
+      setMediaError(friendlyMediaError(err, "mic") ?? "Não foi possível alterar o microfone.");
+    }
     forceTick();
   }, []);
 
@@ -346,7 +487,16 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     const room = roomRef.current;
     if (!room) return;
     const enabled = room.localParticipant.isCameraEnabled;
-    await room.localParticipant.setCameraEnabled(!enabled);
+    try {
+      await room.localParticipant.setCameraEnabled(
+        !enabled,
+        CAMERA_CAPTURE_OPTIONS,
+        CAMERA_PUBLISH_OPTIONS,
+      );
+      setMediaError(null);
+    } catch (err) {
+      setMediaError(friendlyMediaError(err, "camera") ?? "Não foi possível alterar a câmera.");
+    }
     forceTick();
   }, []);
 
@@ -354,7 +504,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     const room = roomRef.current;
     if (!room) return;
     try {
-      await swapOrStartScreenShare(room, quality);
+      await swapOrStartScreenShare(room, quality, forceTick);
     } catch {
       // User cancelled the share picker or denied permission — leave the current share (if any) as-is.
     }
@@ -381,6 +531,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
   return {
     status,
     error,
+    mediaError,
     reconnecting,
     participants,
     micEnabled: room?.localParticipant.isMicrophoneEnabled ?? false,
@@ -442,6 +593,11 @@ export function useCallElapsedMs(sinceIso: string | null | undefined) {
 export interface DmCallHook {
   status: DmCallStatus;
   error: string | null;
+  // Non-fatal: camera failed to start for a video call (falls back to
+  // audio-only) or a mic/camera toggle mid-call was rejected. Never ends
+  // the call -- just tells the user what didn't work instead of the UI
+  // silently disagreeing with the real device state.
+  mediaError: string | null;
   reconnecting: boolean;
   call: DmCallRow | null;
   participants: ParticipantInfo[];
@@ -536,6 +692,7 @@ export function useDmCall(
   const [status, setStatus] = useState<DmCallStatus>("idle");
   const [call, setCall] = useState<DmCallRow | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
 
@@ -594,10 +751,20 @@ export function useDmCall(
       if (callRef.current?.kind === "video") {
         // A camera failure (busy, missing, denied) shouldn't kill an otherwise
         // working audio call — fall back to audio-only instead of aborting.
+        // It must NOT be silent, though: the user asked for video, so they
+        // need to be told it isn't there instead of just never seeing
+        // themselves show up on the other end with no explanation.
         try {
-          await room.localParticipant.setCameraEnabled(true);
-        } catch {
-          // ignored: call continues without video
+          await room.localParticipant.setCameraEnabled(
+            true,
+            CAMERA_CAPTURE_OPTIONS,
+            CAMERA_PUBLISH_OPTIONS,
+          );
+        } catch (err) {
+          setMediaError(
+            friendlyMediaError(err, "camera") ??
+              "Não foi possível acessar sua câmera. A chamada continua, mas sem vídeo.",
+          );
         }
       }
       roomRef.current = room;
@@ -671,6 +838,7 @@ export function useDmCall(
     roomRef.current?.disconnect();
     roomRef.current = null;
     setReconnecting(false);
+    setMediaError(null);
     setCallState(null);
     setStatus("idle");
   }, [setCallState]);
@@ -791,6 +959,7 @@ export function useDmCall(
     async (kind: DmCallKind) => {
       if (!conversationId || !myId) return;
       setError(null);
+      setMediaError(null);
       setStatus("outgoing");
       try {
         // Etapa 6.10 + 6.11: sweep orphaned calls before attempting the
@@ -822,7 +991,9 @@ export function useDmCall(
         setCallState(data);
         await connectRoom(conversationId);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Não foi possível iniciar a chamada.");
+        setError(
+          friendlyMediaError(err, "mic") ?? (err instanceof Error ? err.message : "Não foi possível iniciar a chamada."),
+        );
         setStatus("idle");
       }
     },
@@ -831,6 +1002,7 @@ export function useDmCall(
 
   const accept = useCallback(async () => {
     if (!callRef.current || !conversationId) return;
+    setMediaError(null);
     setStatus("connecting");
     try {
       const { data, error: updateError } = await supabase
@@ -844,7 +1016,9 @@ export function useDmCall(
       await connectRoom(conversationId);
       setStatus("active");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível entrar na chamada.");
+      setError(
+        friendlyMediaError(err, "mic") ?? (err instanceof Error ? err.message : "Não foi possível entrar na chamada."),
+      );
       setStatus("idle");
     }
   }, [conversationId, connectRoom, setCallState]);
@@ -875,15 +1049,31 @@ export function useDmCall(
     const room = roomRef.current;
     if (!room) return;
     const enabled = !room.localParticipant.isMicrophoneEnabled;
-    micPrefRef.current = enabled;
-    await room.localParticipant.setMicrophoneEnabled(enabled, MIC_CAPTURE_OPTIONS);
+    try {
+      await room.localParticipant.setMicrophoneEnabled(enabled, MIC_CAPTURE_OPTIONS);
+      // Same ordering fix as useVoiceRoom.toggleMic: only commit the new
+      // preference after the SDK call actually succeeds.
+      micPrefRef.current = enabled;
+      setMediaError(null);
+    } catch (err) {
+      setMediaError(friendlyMediaError(err, "mic") ?? "Não foi possível alterar o microfone.");
+    }
     forceTick();
   }, []);
 
   const toggleCamera = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
-    await room.localParticipant.setCameraEnabled(!room.localParticipant.isCameraEnabled);
+    try {
+      await room.localParticipant.setCameraEnabled(
+        !room.localParticipant.isCameraEnabled,
+        CAMERA_CAPTURE_OPTIONS,
+        CAMERA_PUBLISH_OPTIONS,
+      );
+      setMediaError(null);
+    } catch (err) {
+      setMediaError(friendlyMediaError(err, "camera") ?? "Não foi possível alterar a câmera.");
+    }
     forceTick();
   }, []);
 
@@ -891,7 +1081,7 @@ export function useDmCall(
     const room = roomRef.current;
     if (!room) return;
     try {
-      await swapOrStartScreenShare(room, quality);
+      await swapOrStartScreenShare(room, quality, forceTick);
     } catch {
       // User cancelled the share picker or denied permission — leave the current share (if any) as-is.
     }
@@ -918,6 +1108,7 @@ export function useDmCall(
   return {
     status,
     error,
+    mediaError,
     reconnecting,
     call,
     participants,

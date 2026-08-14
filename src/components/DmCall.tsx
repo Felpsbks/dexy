@@ -116,6 +116,9 @@ function ParticipantTile({
       }`}
     >
       {!p.isLocal && <TrackAudio track={p.micTrack} muted={deafened} />}
+      {!p.isLocal && p.screenShareTrack && (
+        <TrackAudio track={p.screenShareAudioTrack} muted={deafened} />
+      )}
       {videoTrack ? (
         <>
           <TrackVideo track={videoTrack} muted={p.isLocal} />
@@ -273,6 +276,13 @@ function ScreenShareStage({
         <div className="w-full h-full overflow-hidden">
           <TrackVideo track={sharer.screenShareTrack} muted={sharer.isLocal} contain />
         </div>
+        {/* Tab/system audio, when the sharer's browser includes it — a
+            separate published source from both the video and their
+            microphone, so it needs its own element or it's captured by
+            LiveKit but never actually played for anyone. Never rendered for
+            the local sharer themselves (no self-echo of your own shared
+            audio); respects deafen exactly like the mic track does. */}
+        {!sharer.isLocal && <TrackAudio track={sharer.screenShareAudioTrack} muted={deafened} />}
         <FullscreenButton targetRef={stageRef} />
       </div>
 

@@ -93,6 +93,9 @@ function ParticipantTile({
       }`}
     >
       {!p.isLocal && <TrackAudio track={p.micTrack} muted={deafened} />}
+      {!p.isLocal && p.screenShareTrack && (
+        <TrackAudio track={p.screenShareAudioTrack} muted={deafened} />
+      )}
       {videoTrack ? (
         <>
           <TrackVideo track={videoTrack} muted={p.isLocal} />
@@ -302,6 +305,14 @@ export function VoiceRoomView({
         <div className="mx-4 mt-3 flex items-center justify-center gap-2 rounded-lg bg-secondary px-3 py-1.5 text-xs text-muted-foreground">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
           Reconectando...
+        </div>
+      )}
+      {/* Non-fatal mic/camera device issue while already connected -- the
+          room itself is fine, distinct from voice.error above (which only
+          shows on the pre-join/failed-to-join screen). */}
+      {voice.mediaError && (
+        <div className="mx-4 mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+          {voice.mediaError}
         </div>
       )}
       {voice.screenShareEnabled && (

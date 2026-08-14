@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>FPS-AUDIT-SHARE-SOURCE</title>
+<meta charset="utf-8" />
+<style>html,body{margin:0;padding:0;background:#000;overflow:hidden;}canvas{display:block;}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resize);
+  resize();
+  let frame = 0;
+  function draw() {
+    frame++;
+    const w = canvas.width, h = canvas.height;
+    ctx.fillStyle = "#0a0a12";
+    ctx.fillRect(0, 0, w, h);
+    // moving bars (high spatial + temporal detail, stresses the encoder like real motion content)
+    const n = 24;
+    for (let i = 0; i < n; i++) {
+      const t = frame * 0.03 + i * 0.4;
+      const x = (Math.sin(t) * 0.5 + 0.5) * w;
+      const y = ((i / n) + Math.cos(t * 0.7) * 0.03) * h;
+      const hue = (frame * 2 + i * 15) % 360;
+      ctx.fillStyle = `hsl(${hue},80%,55%)`;
+      ctx.fillRect(x - 40, y - 12, 80, 24);
+    }
+    // bouncing ball
+    const bx = (Math.sin(frame * 0.05) * 0.5 + 0.5) * w;
+    const by = (Math.cos(frame * 0.08) * 0.5 + 0.5) * h;
+    ctx.beginPath();
+    ctx.arc(bx, by, Math.min(w, h) * 0.04, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    // frame counter (also useful to sanity check actual captured fps visually)
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `${Math.round(h * 0.04)}px sans-serif`;
+    ctx.fillText(`frame ${frame}  t=${(performance.now() / 1000).toFixed(2)}s  ${w}x${h}`, 20, h - 20);
+    window.__frameCount = frame;
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+</script>
+</body>
+</html>

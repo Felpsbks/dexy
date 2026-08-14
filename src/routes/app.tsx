@@ -51,6 +51,12 @@ import {
   ShieldCheck,
   Copy,
   Ban,
+  ChevronRight,
+  ChevronLeft,
+  Gamepad2,
+  Heart,
+  BookOpen,
+  School,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DexyLogo } from "@/components/DexyLogo";
@@ -1288,8 +1294,7 @@ function AppPage() {
         )}
       </main>
 
-      <ServerFormDialog
-        mode="create"
+      <AddServerDialog
         open={createServerOpen}
         onOpenChange={setCreateServerOpen}
         onCreated={(server) => {
@@ -1388,6 +1393,309 @@ function OwnProfileBarButton({ profile }: { profile: Profile }) {
         <div className="text-xs text-muted-foreground truncate">{statusLabel[displayStatus]}</div>
       </div>
     </button>
+  );
+}
+
+type ServerTemplateId = "games" | "friends" | "study" | "school";
+
+const SERVER_TEMPLATES: {
+  id: ServerTemplateId;
+  label: string;
+  description: string;
+  icon: typeof Gamepad2;
+  accent: string;
+  suggestedName: string;
+}[] = [
+  {
+    id: "games",
+    label: "Jogos",
+    description: "Para jogar com amigos",
+    icon: Gamepad2,
+    accent: "bg-indigo-500/15 text-indigo-400",
+    suggestedName: "Servidor de Jogos",
+  },
+  {
+    id: "friends",
+    label: "Amigos",
+    description: "Para seu círculo de amigos",
+    icon: Heart,
+    accent: "bg-rose-500/15 text-rose-400",
+    suggestedName: "Turma de Amigos",
+  },
+  {
+    id: "study",
+    label: "Grupo de estudos",
+    description: "Para estudar e colaborar",
+    icon: BookOpen,
+    accent: "bg-emerald-500/15 text-emerald-400",
+    suggestedName: "Grupo de Estudos",
+  },
+  {
+    id: "school",
+    label: "Clube escolar",
+    description: "Para clubes e atividades escolares",
+    icon: School,
+    accent: "bg-amber-500/15 text-amber-400",
+    suggestedName: "Clube Escolar",
+  },
+];
+
+// Discord-style "+" entry point: a hub (create / templates / join) in front
+// of the same create_server() RPC used everywhere else (see useCreateServer
+// below) — templates only prefill the name field, they don't invent a
+// backend template concept that doesn't exist. The join step reuses the
+// existing /invite/$code page (usePreviewInvite + useAcceptInvite) instead
+// of duplicating accept-invite logic here — it just extracts a code from
+// whatever the user pastes and navigates there.
+function AddServerDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated?: (server: Server) => void;
+}) {
+  const router = useRouter();
+  const createServer = useCreateServer();
+  const [step, setStep] = useState<"hub" | "create" | "join">("hub");
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [inviteInput, setInviteInput] = useState("");
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setStep("hub");
+    setName("");
+    setError(null);
+    setInviteInput("");
+    setInviteError(null);
+  }, [open]);
+
+  const close = () => onOpenChange(false);
+
+  const handleCreate = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || createServer.isPending) return;
+    setError(null);
+    try {
+      const created = await createServer.mutateAsync(trimmed);
+      close();
+      onCreated?.(created);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível criar o servidor.");
+    }
+  };
+
+  const handleJoin = () => {
+    const raw = inviteInput.trim();
+    if (!raw) return;
+    const match = raw.match(/\/invite\/([^/?#\s]+)/);
+    const code = (match ? match[1] : raw).trim();
+    if (!code) {
+      setInviteError("Cole um link ou código de convite válido.");
+      return;
+    }
+    close();
+    router.navigate({ to: "/invite/$code", params: { code } });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
+      <DialogContent className="max-w-md rounded-3xl border-white/5 bg-card/95 backdrop-blur-xl p-0 gap-0">
+        <div className="p-6 sm:p-8">
+          <AnimatePresence mode="wait" initial={false}>
+            {step === "hub" && (
+              <motion.div
+                key="hub"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+              >
+                <DialogHeader className="text-center sm:text-center">
+                  <DialogTitle className="text-xl font-bold">Criar seu servidor</DialogTitle>
+                  <DialogDescription className="text-sm">
+                    Seu servidor é onde você e seus amigos se reúnem. Crie o seu e comece a
+                    interagir.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="mt-6 space-y-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setName("");
+                      setStep("create");
+                    }}
+                    className="w-full flex items-center gap-4 rounded-2xl border border-border bg-secondary/60 px-4 py-4 text-left transition hover:bg-secondary hover:border-primary/40 hover:shadow-(--shadow-glow)"
+                  >
+                    <span className="grid place-items-center w-11 h-11 rounded-xl bg-primary/15 text-primary shrink-0">
+                      <Plus className="w-5 h-5" />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold">Criar o meu</span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">
+                        Comece do zero
+                      </span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </button>
+
+                  <div>
+                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-3">
+                      Começar de um modelo
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {SERVER_TEMPLATES.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          onClick={() => {
+                            setName(tpl.suggestedName);
+                            setStep("create");
+                          }}
+                          className="flex items-center gap-3 rounded-xl border border-border bg-secondary/40 px-3.5 py-3 text-left transition hover:bg-secondary hover:border-primary/30"
+                        >
+                          <span
+                            className={`grid place-items-center w-9 h-9 rounded-lg shrink-0 ${tpl.accent}`}
+                          >
+                            <tpl.icon className="w-4 h-4" />
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-medium">{tpl.label}</span>
+                            <span className="block text-xs text-muted-foreground mt-0.5 leading-snug">
+                              {tpl.description}
+                            </span>
+                          </span>
+                          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 self-start mt-0.5" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-border/60 text-center">
+                    <p className="text-xs text-muted-foreground mb-3">Já tem um convite?</p>
+                    <button
+                      type="button"
+                      onClick={() => setStep("join")}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-border bg-secondary/40 px-4 py-2.5 text-sm font-semibold transition hover:bg-secondary hover:border-primary/40"
+                    >
+                      Entrar em um servidor
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {step === "create" && (
+              <motion.div
+                key="create"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setStep("hub")}
+                  aria-label="Voltar"
+                  className="mb-2 -ml-1.5 inline-flex items-center gap-1 rounded-full p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-bold">
+                    Personalize seu servidor
+                  </DialogTitle>
+                  <DialogDescription>
+                    Dê um nome ao seu servidor. Você poderá ajustar o resto depois.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4">
+                  <input
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleCreate();
+                    }}
+                    placeholder="Nome do servidor"
+                    maxLength={100}
+                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-primary"
+                  />
+                  {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+                </div>
+                <DialogFooter className="mt-6">
+                  <button
+                    onClick={() => void handleCreate()}
+                    disabled={!name.trim() || createServer.isPending}
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40 transition hover:brightness-110"
+                    style={{ backgroundImage: "var(--gradient-dexy)" }}
+                  >
+                    {createServer.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Criar servidor
+                  </button>
+                </DialogFooter>
+              </motion.div>
+            )}
+
+            {step === "join" && (
+              <motion.div
+                key="join"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setStep("hub")}
+                  aria-label="Voltar"
+                  className="mb-2 -ml-1.5 inline-flex items-center gap-1 rounded-full p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-bold">Entrar em um servidor</DialogTitle>
+                  <DialogDescription>
+                    Cole um link ou código de convite para entrar em um servidor existente.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4">
+                  <input
+                    autoFocus
+                    value={inviteInput}
+                    onChange={(e) => {
+                      setInviteInput(e.target.value);
+                      setInviteError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleJoin();
+                    }}
+                    placeholder="https://dexy.app/invite/abc123 ou abc123"
+                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-primary"
+                  />
+                  {inviteError && <p className="mt-2 text-xs text-destructive">{inviteError}</p>}
+                </div>
+                <DialogFooter className="mt-6">
+                  <button
+                    onClick={handleJoin}
+                    disabled={!inviteInput.trim()}
+                    className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40 transition hover:brightness-110"
+                    style={{ backgroundImage: "var(--gradient-dexy)" }}
+                  >
+                    Entrar no servidor
+                  </button>
+                </DialogFooter>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

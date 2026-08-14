@@ -642,6 +642,15 @@ export function DmChatView({
             {dmCall.error}
           </div>
         )}
+        {/* Non-fatal: mic/camera device issue during an otherwise-working
+            call (e.g. camera couldn't start, a toggle got rejected) --
+            distinct from dmCall.error above, which only ever appears when
+            the call itself failed/ended. */}
+        {dmCall.mediaError && (
+          <div className="mx-3 sm:mx-6 mt-3 px-4 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-sm text-amber-500">
+            {dmCall.mediaError}
+          </div>
+        )}
 
         <AnimatePresence>
           {dmCall.status === "incoming" && dmCall.call && callHere && (
