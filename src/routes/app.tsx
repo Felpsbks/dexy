@@ -57,6 +57,8 @@ import {
   Heart,
   BookOpen,
   School,
+  Globe,
+  ImagePlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DexyLogo } from "@/components/DexyLogo";
@@ -1458,7 +1460,11 @@ function AddServerDialog({
 }) {
   const router = useRouter();
   const createServer = useCreateServer();
-  const [step, setStep] = useState<"hub" | "create" | "join">("hub");
+  const [step, setStep] = useState<"hub" | "audience" | "create" | "join">("hub");
+  // Tracks how the create-step's back button gets home: the audience
+  // question only appears for "Comece do zero" (matches the reference flow
+  // where picking a template already implies the server's purpose).
+  const [origin, setOrigin] = useState<"own" | "template">("own");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [inviteInput, setInviteInput] = useState("");
@@ -1527,7 +1533,8 @@ function AddServerDialog({
                     type="button"
                     onClick={() => {
                       setName("");
-                      setStep("create");
+                      setOrigin("own");
+                      setStep("audience");
                     }}
                     className="w-full flex items-center gap-4 rounded-2xl border border-border bg-secondary/60 px-4 py-4 text-left transition hover:bg-secondary hover:border-primary/40 hover:shadow-(--shadow-glow)"
                   >
@@ -1554,6 +1561,7 @@ function AddServerDialog({
                           type="button"
                           onClick={() => {
                             setName(tpl.suggestedName);
+                            setOrigin("template");
                             setStep("create");
                           }}
                           className="flex items-center gap-3 rounded-xl border border-border bg-secondary/40 px-3.5 py-3 text-left transition hover:bg-secondary hover:border-primary/30"
@@ -1590,9 +1598,9 @@ function AddServerDialog({
               </motion.div>
             )}
 
-            {step === "create" && (
+            {step === "audience" && (
               <motion.div
-                key="create"
+                key="audience"
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
@@ -1608,13 +1616,93 @@ function AddServerDialog({
                 </button>
                 <DialogHeader>
                   <DialogTitle className="text-lg font-bold">
-                    Personalize seu servidor
+                    Conte-nos mais sobre o seu servidor
+                  </DialogTitle>
+                  <DialogDescription>
+                    Para podermos te ajudar com as configurações, seu novo servidor é para
+                    alguns amigos ou uma grande comunidade?
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="mt-5 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep("create")}
+                    className="w-full flex items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3.5 text-left transition hover:bg-secondary hover:border-primary/30"
+                  >
+                    <span className="grid place-items-center w-9 h-9 rounded-lg shrink-0 bg-rose-500/15 text-rose-400">
+                      <Users className="w-4 h-4" />
+                    </span>
+                    <span className="flex-1 min-w-0 text-sm font-medium">
+                      Para meus amigos e eu
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep("create")}
+                    className="w-full flex items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3.5 text-left transition hover:bg-secondary hover:border-primary/30"
+                  >
+                    <span className="grid place-items-center w-9 h-9 rounded-lg shrink-0 bg-blue-500/15 text-blue-400">
+                      <Globe className="w-4 h-4" />
+                    </span>
+                    <span className="flex-1 min-w-0 text-sm font-medium">
+                      Para um clube ou comunidade
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </button>
+                </div>
+
+                <p className="mt-5 text-center text-xs text-muted-foreground">
+                  Não sabe?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setStep("create")}
+                    className="text-primary hover:underline"
+                  >
+                    Pular essa pergunta
+                  </button>{" "}
+                  por enquanto.
+                </p>
+              </motion.div>
+            )}
+
+            {step === "create" && (
+              <motion.div
+                key="create"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+              >
+                <DialogHeader className="text-center sm:text-center">
+                  <DialogTitle className="text-lg font-bold">
+                    Personalize o seu servidor
                   </DialogTitle>
                   <DialogDescription>
                     Dê um nome ao seu servidor. Você poderá ajustar o resto depois.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="mt-4">
+
+                <div className="mt-5 flex justify-center">
+                  {name.trim() ? (
+                    <div
+                      className="grid place-items-center w-20 h-20 rounded-full text-2xl font-bold text-primary-foreground shrink-0"
+                      style={{ backgroundImage: "var(--gradient-dexy)" }}
+                    >
+                      {name.trim().charAt(0).toUpperCase()}
+                    </div>
+                  ) : (
+                    <div className="grid place-items-center w-20 h-20 rounded-full border-2 border-dashed border-border text-muted-foreground shrink-0">
+                      <ImagePlus className="w-6 h-6" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-5">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                    Nome do servidor <span className="text-destructive">*</span>
+                  </label>
                   <input
                     autoFocus
                     value={name}
@@ -1622,13 +1710,21 @@ function AddServerDialog({
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void handleCreate();
                     }}
-                    placeholder="Nome do servidor"
+                    placeholder="Digite o nome do servidor"
                     maxLength={100}
                     className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-primary"
                   />
                   {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
                 </div>
-                <DialogFooter className="mt-6">
+
+                <DialogFooter className="mt-6 sm:justify-between sm:space-x-0">
+                  <button
+                    type="button"
+                    onClick={() => setStep(origin === "own" ? "audience" : "hub")}
+                    className="text-sm font-semibold text-muted-foreground transition hover:text-foreground px-2 py-2"
+                  >
+                    Voltar
+                  </button>
                   <button
                     onClick={() => void handleCreate()}
                     disabled={!name.trim() || createServer.isPending}
