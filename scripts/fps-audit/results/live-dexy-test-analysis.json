@@ -1,0 +1,707 @@
+{
+  "outRows": [
+    {
+      "t": 1786714860004,
+      "framesPerSecond": 15,
+      "framesEncoded": 452,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 6407014,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 30.133,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714862033,
+      "framesPerSecond": 15,
+      "framesEncoded": 482,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 6833560,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 32.16,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714864049,
+      "framesPerSecond": 15,
+      "framesEncoded": 512,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 7302450,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 34.176,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714866071,
+      "framesPerSecond": 16,
+      "framesEncoded": 543,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 7754120,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 36.198,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714868087,
+      "framesPerSecond": 15,
+      "framesEncoded": 573,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 8177761,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 38.214,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714870104,
+      "framesPerSecond": 15,
+      "framesEncoded": 603,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 8614514,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 40.23,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714872123,
+      "framesPerSecond": 15,
+      "framesEncoded": 634,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 9060094,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 42.25,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714874137,
+      "framesPerSecond": 15,
+      "framesEncoded": 664,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 9493351,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 44.264,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714876151,
+      "framesPerSecond": 15,
+      "framesEncoded": 694,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 9934504,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 46.278,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714878174,
+      "framesPerSecond": 14,
+      "framesEncoded": 724,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 10378424,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 48.302,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714880193,
+      "framesPerSecond": 15,
+      "framesEncoded": 755,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 10850759,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 50.32,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714882203,
+      "framesPerSecond": 15,
+      "framesEncoded": 785,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 11277229,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 52.33,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714884215,
+      "framesPerSecond": 15,
+      "framesEncoded": 815,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 11705939,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 54.342,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714886224,
+      "framesPerSecond": 15,
+      "framesEncoded": 845,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 12147263,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 56.351,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714888243,
+      "framesPerSecond": 15,
+      "framesEncoded": 875,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesSent": 12587921,
+      "qualityLimitationReason": "none",
+      "qualityLimitationDurations": {
+        "bandwidth": 0,
+        "cpu": 0,
+        "none": 58.37,
+        "other": 0
+      },
+      "codecId": "COT01_96_x-google-start-bitrate=2250",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    }
+  ],
+  "inRows": [
+    {
+      "t": 1786714860004,
+      "framesPerSecond": 15,
+      "framesDecoded": 450,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 6400474,
+      "packetsLost": 0,
+      "jitter": 0.004,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714862033,
+      "framesPerSecond": 15,
+      "framesDecoded": 481,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 6827020,
+      "packetsLost": 0,
+      "jitter": 0.002,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714864049,
+      "framesPerSecond": 15,
+      "framesDecoded": 511,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 7295910,
+      "packetsLost": 0,
+      "jitter": 0.002,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714866071,
+      "framesPerSecond": 15,
+      "framesDecoded": 541,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 7747580,
+      "packetsLost": 0,
+      "jitter": 0.001,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714868087,
+      "framesPerSecond": 15,
+      "framesDecoded": 572,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 8171221,
+      "packetsLost": 0,
+      "jitter": 0.002,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714870104,
+      "framesPerSecond": 15,
+      "framesDecoded": 602,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 8607974,
+      "packetsLost": 0,
+      "jitter": 0.003,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714872123,
+      "framesPerSecond": 15,
+      "framesDecoded": 632,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 9053554,
+      "packetsLost": 0,
+      "jitter": 0.002,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714874137,
+      "framesPerSecond": 15,
+      "framesDecoded": 662,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 9486811,
+      "packetsLost": 0,
+      "jitter": 0.001,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714876151,
+      "framesPerSecond": 15,
+      "framesDecoded": 693,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 9927964,
+      "packetsLost": 0,
+      "jitter": 0.002,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714878174,
+      "framesPerSecond": 15,
+      "framesDecoded": 723,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 10371884,
+      "packetsLost": 0,
+      "jitter": 0.001,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714880193,
+      "framesPerSecond": 15,
+      "framesDecoded": 753,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 10844219,
+      "packetsLost": 0,
+      "jitter": 0.004,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714882203,
+      "framesPerSecond": 15,
+      "framesDecoded": 783,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 11270689,
+      "packetsLost": 0,
+      "jitter": 0.001,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714884215,
+      "framesPerSecond": 15,
+      "framesDecoded": 814,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 11699399,
+      "packetsLost": 0,
+      "jitter": 0.002,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714886224,
+      "framesPerSecond": 15,
+      "framesDecoded": 844,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 12140723,
+      "packetsLost": 0,
+      "jitter": 0.001,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    },
+    {
+      "t": 1786714888243,
+      "framesPerSecond": 15,
+      "framesDecoded": 874,
+      "framesDropped": 0,
+      "frameWidth": 1920,
+      "frameHeight": 1080,
+      "bytesReceived": 12581381,
+      "packetsLost": 0,
+      "jitter": 0.003,
+      "codecId": "CIT01_96",
+      "codec": {
+        "mimeType": "video/VP8",
+        "payloadType": 96,
+        "clockRate": 90000
+      }
+    }
+  ],
+  "cpRows": [
+    {
+      "t": 1786714860004,
+      "currentRoundTripTime": 0.003,
+      "availableOutgoingBitrate": 3148977,
+      "bytesSent": 6653166,
+      "bytesReceived": 71240
+    },
+    {
+      "t": 1786714862033,
+      "currentRoundTripTime": 0.003,
+      "availableOutgoingBitrate": 3148977,
+      "bytesSent": 7093970,
+      "bytesReceived": 72698
+    },
+    {
+      "t": 1786714864049,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3181141,
+      "bytesSent": 7578534,
+      "bytesReceived": 74210
+    },
+    {
+      "t": 1786714866071,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 8045248,
+      "bytesReceived": 75664
+    },
+    {
+      "t": 1786714868087,
+      "currentRoundTripTime": 0.005,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 8483141,
+      "bytesReceived": 77114
+    },
+    {
+      "t": 1786714870104,
+      "currentRoundTripTime": 0.005,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 8934680,
+      "bytesReceived": 78614
+    },
+    {
+      "t": 1786714872123,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 9395100,
+      "bytesReceived": 80056
+    },
+    {
+      "t": 1786714874137,
+      "currentRoundTripTime": 0.003,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 9842641,
+      "bytesReceived": 81514
+    },
+    {
+      "t": 1786714876151,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 10298622,
+      "bytesReceived": 82960
+    },
+    {
+      "t": 1786714878174,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 10757316,
+      "bytesReceived": 84414
+    },
+    {
+      "t": 1786714880193,
+      "currentRoundTripTime": 0.005,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 11245397,
+      "bytesReceived": 85992
+    },
+    {
+      "t": 1786714882203,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 11686218,
+      "bytesReceived": 87457
+    },
+    {
+      "t": 1786714884215,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 12129222,
+      "bytesReceived": 88915
+    },
+    {
+      "t": 1786714886224,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 12585308,
+      "bytesReceived": 90369
+    },
+    {
+      "t": 1786714888243,
+      "currentRoundTripTime": 0.004,
+      "availableOutgoingBitrate": 3198347,
+      "bytesSent": 13040764,
+      "bytesReceived": 91783
+    }
+  ],
+  "fpsEnviado": {
+    "value": 14.979283968979072,
+    "dt": 28.239,
+    "from": 452,
+    "to": 875
+  },
+  "fpsRecebido": {
+    "value": 15.014695987818266,
+    "dt": 28.239,
+    "from": 450,
+    "to": 874
+  },
+  "bitrateEnviado": {
+    "value": 218878.3951273062,
+    "dt": 28.239,
+    "from": 6407014,
+    "to": 12587921
+  },
+  "bitrateRecebido": {
+    "value": 218878.3951273062,
+    "dt": 28.239,
+    "from": 6400474,
+    "to": 12581381
+  }
+}

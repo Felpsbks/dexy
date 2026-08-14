@@ -29,13 +29,23 @@ function loadEnv(file) {
 const env = loadEnv(path.join(ROOT, ".env"));
 const SUPABASE_URL = env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY;
-const BASE_URL = "http://localhost:8080";
+const BASE_URL = "http://localhost:8081"; // 8080 had a stuck listener from an earlier session; this dev server instance is on 8081
 
-// signUp() for brand-new throwaway addresses fails in this project
-// ("Error sending confirmation email") -- using two already-confirmed
-// accounts instead: the existing dm-bot account (already used by
-// scripts/dm-bot.mjs) plus a second real account the user provided directly.
-const A = { email: env.DEXY_BOT_EMAIL, password: env.DEXY_BOT_PASSWORD };
+// dm-bot account doesn't exist/isn't confirmed (signIn fails). B is a real
+// account the user provided directly. A is created fresh through the REAL
+// signup UI (not the raw API -- the earlier raw signUp() attempt failed with
+// "Error sending confirmation email"; driving the actual form doubles as a
+// live test of the signup flow itself).
+const TS = Date.now();
+const A = {
+  email: `fps-audit-a-${TS}@example.com`,
+  password: `FpsAudit!2026a${TS}`,
+  // Unique per run -- earlier failed runs left behind several same-named
+  // throwaway accounts already friended with B; a fixed name would make
+  // openDmWith's text match ambiguous (or worse, silently pick a stale one).
+  name: `FPS Audit A ${TS}`,
+  phone: "11999999999",
+};
 const B = { email: "ferepetido@gmail.com", password: "Felps@2712" };
 
 async function signIn(acc) {
@@ -46,7 +56,36 @@ async function signIn(acc) {
   return { id: data.user.id, name: profile?.name ?? acc.email, sb };
 }
 
-async function ensureFriendship(sbA, aId, bId) {
+// Drives the real /login signup form (mode=signup) instead of calling
+// supabase.auth.signUp() directly -- this IS the signup-flow test the user
+// asked for, not just a means to an account. Returns which of the 3 real
+// outcomes actually happened (immediate session / OTP email step / error)
+// so the caller can react correctly instead of assuming success.
+async function signUpViaUI(page, acc) {
+  await page.goto(`${BASE_URL}/login`);
+  await page.waitForTimeout(1000);
+  await page.getByRole("button", { name: /Criar uma conta/ }).click();
+  await page.waitForTimeout(500);
+  await page.getByPlaceholder("Nome de exibição").fill(acc.name);
+  await page.getByPlaceholder("E-mail ou nome de usuário").fill(acc.email);
+  await page.getByPlaceholder("Telefone, com DDD").fill(acc.phone);
+  await page.getByPlaceholder("Senha").fill(acc.password);
+  await page.getByRole("button", { name: "Criar conta" }).click();
+  await page.waitForTimeout(4000);
+  if (page.url().startsWith(`${BASE_URL}/app`)) return { outcome: "session-immediate" };
+  const otpVisible = await page.getByText("Verifique seu e-mail").isVisible().catch(() => false);
+  if (otpVisible) return { outcome: "otp-required" };
+  const errorEl = page.locator("p.text-destructive, p.text-red-400");
+  const errorText = await errorEl.first().textContent().catch(() => null);
+  return { outcome: "error", errorText };
+}
+
+// RLS (supabase/migrations/20260808200000_fix_friendships_rls.sql) closed
+// the direct-insert-as-accepted hole dm-bot.mjs's version of this relied on:
+// INSERT now requires status='pending' AND auth.uid()=user_id, and flipping
+// to 'accepted' requires auth.uid()=friend_id (i.e. only the recipient can
+// accept) -- so this needs both sides' authenticated clients, request-then-accept.
+async function ensureFriendship(sbA, aId, sbB, bId) {
   const { data: existing } = await sbA
     .from("friendships")
     .select("user_id, friend_id, status")
@@ -54,16 +93,18 @@ async function ensureFriendship(sbA, aId, bId) {
     .maybeSingle();
   if (existing?.status === "accepted") return;
   if (!existing) {
-    const { error } = await sbA.from("friendships").insert({ user_id: aId, friend_id: bId, status: "accepted" });
-    if (error) throw new Error(`friendship insert: ${error.message}`);
-    return;
+    const { error } = await sbA.from("friendships").insert({ user_id: aId, friend_id: bId, status: "pending" });
+    if (error) throw new Error(`friendship insert (pending): ${error.message}`);
   }
-  const { error } = await sbA
+  // Whoever is friend_id on the row is the one allowed to accept it.
+  const row = existing ?? { user_id: aId, friend_id: bId };
+  const sbRecipient = row.friend_id === bId ? sbB : sbA;
+  const { error } = await sbRecipient
     .from("friendships")
     .update({ status: "accepted" })
-    .eq("user_id", existing.user_id)
-    .eq("friend_id", existing.friend_id);
-  if (error) throw new Error(`friendship update: ${error.message}`);
+    .eq("user_id", row.user_id)
+    .eq("friend_id", row.friend_id);
+  if (error) throw new Error(`friendship accept: ${error.message}`);
 }
 
 const STATS_INIT_SCRIPT = `
@@ -101,27 +142,27 @@ async function samplePCStats(page) {
 
 async function login(page, acc) {
   await page.goto(`${BASE_URL}/login`);
+  await page.waitForTimeout(1000);
   await page.getByPlaceholder("E-mail ou nome de usuário").fill(acc.email);
   await page.getByPlaceholder("Senha").fill(acc.password);
-  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.getByRole("button", { name: "Entrar", exact: true }).click();
   await page.waitForURL(`${BASE_URL}/app`, { timeout: 20000 });
 }
 
 async function openDmWith(page, otherName) {
   await page.getByRole("button", { name: "Amigos", exact: true }).click();
-  await page.getByText(otherName, { exact: true }).click();
+  // Earlier failed runs of this script left behind several same-named
+  // throwaway "FPS Audit A" accounts already friended with B -- any of them
+  // is fine, they're interchangeable, so just take the first match.
+  await page.getByText(otherName, { exact: true }).first().click();
   // DmChatView header only renders once the conversation is actually open.
   await page.getByTitle("Chamada de voz").waitFor({ state: "visible", timeout: 10000 });
 }
 
 async function main() {
-  console.log("[1/8] Autenticando as 2 contas existentes...");
-  const { id: aId, name: aName, sb: sbA } = await signIn(A);
-  const { id: bId, name: bName } = await signIn(B);
-  A.name = aName;
+  console.log("[1/8] Login de B (conta existente) via API...");
+  const { id: bId, name: bName, sb: sbB } = await signIn(B);
   B.name = bName;
-  await ensureFriendship(sbA, aId, bId);
-  console.log(`  A=${A.name} (${aId})  B=${B.name} (${bId}) -- amizade ok`);
 
   console.log("[2/8] Abrindo 2 janelas Chromium reais (fake device p/ mic, SEM fake-ui de tela)...");
   const browserA = await chromium.launch({
@@ -141,11 +182,44 @@ async function main() {
   const pageA = await ctxA.newPage();
   const pageB = await ctxB.newPage();
 
-  console.log("[3/8] Logando as 2 contas...");
-  await login(pageA, A);
+  console.log("[3/8] Testando o cadastro real (UI) para a conta A...");
+  const signupResult = await signUpViaUI(pageA, A);
+  console.log("  resultado do cadastro:", signupResult);
+  if (signupResult.outcome !== "session-immediate") {
+    throw new Error(
+      `Cadastro não completou automaticamente (${signupResult.outcome}${
+        signupResult.errorText ? ": " + signupResult.errorText : ""
+      }) -- sem acesso à caixa de entrada pra confirmar OTP por e-mail.`,
+    );
+  }
+  // Bridge the browser's real signup session into a Node-side Supabase
+  // client, so ensureFriendship can run authenticated as A (RLS requires
+  // the inserting session to be one of the two friendship parties).
+  const authEntry = await pageA.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.includes("auth-token"));
+    return key ? localStorage.getItem(key) : null;
+  });
+  if (!authEntry) throw new Error("Sessão de A não encontrada no localStorage após o cadastro.");
+  const sessionObj = JSON.parse(authEntry);
+  const sbA = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  await sbA.auth.setSession({ access_token: sessionObj.access_token, refresh_token: sessionObj.refresh_token });
+  const {
+    data: { user: aUser },
+  } = await sbA.auth.getUser();
+  const aId = aUser.id;
+  console.log(`  cadastro de A concluído com sessão imediata (sem OTP). id=${aId}`);
+
+  await ensureFriendship(sbA, aId, sbB, bId);
+  console.log(`  A=${A.name} (${aId})  B=${B.name} (${bId}) -- amizade ok`);
+
+  console.log("[3.5/8] Logando B na segunda janela (A já está logada pelo cadastro)...");
   await login(pageB, B);
 
   console.log("[4/8] Abrindo a conversa DM dos dois lados...");
+  // pageA's friends list was fetched at signup time, before the friendship
+  // existed -- reload so both sides start from a fresh query that sees it.
+  await pageA.reload();
+  await pageA.waitForTimeout(1500);
   await openDmWith(pageA, B.name);
   await openDmWith(pageB, A.name);
 

@@ -5,7 +5,7 @@
 // reais (Playwright) publicando/assinando com o livekit-client real do
 // projeto, e lê getStats() nativo do WebRTC — números reais, não simulados.
 import { createServer } from "node:http";
-import { readFile, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFile, readFileSync, writeFileSync, mkdirSync, statSync, createReadStream } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -37,6 +37,7 @@ const PORT = 8934;
 function contentType(p) {
   if (p.endsWith(".html")) return "text/html";
   if (p.endsWith(".js")) return "application/javascript";
+  if (p.endsWith(".mp4")) return "video/mp4";
   return "application/octet-stream";
 }
 const server = createServer((req, res) => {
@@ -45,6 +46,36 @@ const server = createServer((req, res) => {
   if (!filePath.startsWith(__dirname)) {
     res.writeHead(403);
     res.end();
+    return;
+  }
+  // <video> autoplay/loop in Chrome routinely issues Range requests even for
+  // small local files -- serving 200s for those can stall playback, so mp4s
+  // get real 206 partial-content support.
+  if (filePath.endsWith(".mp4")) {
+    let size;
+    try {
+      size = statSync(filePath).size;
+    } catch {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+    const range = req.headers.range;
+    if (range) {
+      const [startStr, endStr] = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(startStr, 10);
+      const end = endStr ? parseInt(endStr, 10) : size - 1;
+      res.writeHead(206, {
+        "Content-Range": `bytes ${start}-${end}/${size}`,
+        "Accept-Ranges": "bytes",
+        "Content-Length": end - start + 1,
+        "Content-Type": "video/mp4",
+      });
+      createReadStream(filePath, { start, end }).pipe(res);
+    } else {
+      res.writeHead(200, { "Content-Length": size, "Content-Type": "video/mp4", "Accept-Ranges": "bytes" });
+      createReadStream(filePath).pipe(res);
+    }
     return;
   }
   readFile(filePath, (err, data) => {
@@ -228,6 +259,47 @@ const SCREEN_MODE_SCENARIOS = [
   },
 ];
 
+// Fase 7.6 -- "aba vs tela inteira, mesmo conteúdo" comparison: mirrors
+// Dexy's exact current SCREEN_SHARE_QUALITIES["1080p"] (unchanged --
+// resolution/bitrate/maxFramerate stay whatever's actually shipped) across
+// three capture surfaces so mode is the only thing that varies.
+const COMPARISON_SCENARIOS = [
+  {
+    id: "cmp_tab_canvas",
+    kind: "screenshare",
+    mode: "tab",
+    label: "Comparação — ABA com canvas/animação",
+    resolution: { width: 1920, height: 1080, frameRate: 60 },
+    encoding: { maxBitrate: 7_000_000, maxFramerate: 60 },
+  },
+  {
+    id: "cmp_tab_video",
+    kind: "screenshare",
+    mode: "tab",
+    contentPage: "video",
+    label: "Comparação — ABA com <video> real (mp4 60fps)",
+    resolution: { width: 1920, height: 1080, frameRate: 60 },
+    encoding: { maxBitrate: 7_000_000, maxFramerate: 60 },
+  },
+  {
+    id: "cmp_tab_canvas_720p",
+    kind: "screenshare",
+    mode: "tab",
+    label: "Comparação — ABA com canvas, 720p60 (tie-breaker: resolução menor = menos pixels/frame pro encoder)",
+    resolution: { width: 1280, height: 720, frameRate: 60 },
+    encoding: { maxBitrate: 7_000_000, maxFramerate: 60 },
+  },
+  {
+    id: "cmp_screen_canvas",
+    kind: "screenshare",
+    mode: "screen",
+    label: "Comparação — TELA INTEIRA, mesmo canvas/animação",
+    resolution: { width: 1920, height: 1080, frameRate: 60 },
+    encoding: { maxBitrate: 7_000_000, maxFramerate: 60 },
+    captureSourceTitle: "Entire screen",
+  },
+];
+
 // Simulcast means outbound-rtp can have several video entries (one per
 // active rid/layer) -- dynacast pauses the ones nobody's subscribed to, so
 // picking "the first match" can land on a dormant high-res layer (frameWidth
@@ -323,7 +395,8 @@ async function runScenario(scenario, { windowSourceBrowser } = {}) {
     }
     if (sharePage) await sharePage.bringToFront();
 
-    await pubPage.goto(`http://localhost:${PORT}/index.html`);
+    const pubEntryPage = scenario.contentPage === "video" ? "video-index.html" : "index.html";
+    await pubPage.goto(`http://localhost:${PORT}/${pubEntryPage}`);
     await pubPage.waitForFunction("window.__harnessReady === true");
     await subPage.goto(`http://localhost:${PORT}/index.html`);
     await subPage.waitForFunction("window.__harnessReady === true");
@@ -340,7 +413,13 @@ async function runScenario(scenario, { windowSourceBrowser } = {}) {
         [scenario.resolution, scenario.publishOptions ?? null],
       );
     } else {
-      if (scenario.mode === "tab") await pubPage.evaluate(() => window.__harness.startAnimatedCanvas());
+      if (scenario.mode === "tab" && scenario.contentPage !== "video") {
+        await pubPage.evaluate(() => window.__harness.startAnimatedCanvas());
+      }
+      if (scenario.contentPage === "video") {
+        // let autoplay actually start producing decoded frames before capture
+        await pubPage.waitForTimeout(1000);
+      }
       await pubPage.evaluate(
         (opts) => window.__harness.publishScreenShare(opts),
         { resolution: scenario.resolution, encoding: scenario.encoding, preferCurrentTab: scenario.mode === "tab" },
@@ -447,7 +526,7 @@ async function main() {
   const results = [];
 
   let windowSourceBrowser = null;
-  if (which === "all" || which === "mode") {
+  if (which === "all" || which === "mode" || which === "compare") {
     windowSourceBrowser = await chromium.launch({ headless: false, args: ["--window-size=1920,1080", "--window-position=0,0"] });
   }
 
@@ -456,6 +535,7 @@ async function main() {
   if (which === "all" || which === "after") scenarioSets.push(...CAMERA_AFTER_SCENARIOS);
   if (which === "all" || which === "ssres") scenarioSets.push(...SCREEN_RES_SCENARIOS);
   if (which === "all" || which === "mode") scenarioSets.push(...SCREEN_MODE_SCENARIOS);
+  if (which === "all" || which === "compare") scenarioSets.push(...COMPARISON_SCENARIOS);
 
   for (const scenario of scenarioSets) {
     const raw = await runScenario(scenario, { windowSourceBrowser });
