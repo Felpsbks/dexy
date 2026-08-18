@@ -71,6 +71,9 @@ import { AudioDeviceSelector } from "@/components/AudioDeviceSelector";
 import { ReactionButton, ReactionList, ReactionPicker } from "@/components/MessageReactions";
 import { ProfilePopoverProvider, useProfilePopover } from "@/components/ProfilePopover";
 import {
+  useGlobalAudioProcessing,
+} from "@/lib/voice-processing-hooks";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -302,6 +305,7 @@ function AppPage() {
   // ignoring further navigation.
   const [callConversationId, setCallConversationId] = useState<string | undefined>(undefined);
   const dmCall = useDmCall(callConversationId, userId);
+  useGlobalAudioProcessing();
   useCallSounds(dmCall.status);
   useReconnectingSound(dmCall.reconnecting);
   useScreenShareSound(dmCall.screenShareEnabled);

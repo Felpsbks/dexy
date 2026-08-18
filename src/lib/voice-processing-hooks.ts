@@ -4,7 +4,12 @@
  * 1. Forçar o deviceId selecionado pelo usuário (não pegar mic da câmera)
  * 2. Aplicar processamento Web Audio API (compressão, EQ, filtros)
  *
- * Cadeia: mic correto → highPass → lowPass → compressor → gain → LiveKit
+ * IMPORTANTE: O override é instalado IMEDIATAMENTE quando o usuário seleciona
+ * um mic (não apenas quando entra na chamada), porque o LiveKit SDK chama
+ * getUserMedia() durante o setMicrophoneEnabled() — antes do status mudar para
+ * "connected". Instalar depois deixa o mic sem processamento.
+ *
+ * Cadeia: mic correto → notch50 → notch60 → highPass → lowPass → compressor → gain → LiveKit
  */
 
 import { useEffect, useRef } from "react";
@@ -42,6 +47,11 @@ function installAudioProcessingOverride() {
       // Aplicar processamento de áudio
       try {
         const processor = getAudioProcessor();
+        // Garante que o AudioContext está rodando (Chrome suspende
+        // AudioContext criado sem interação do usuário)
+        if (processor.audioContext.state === "suspended") {
+          await processor.audioContext.resume();
+        }
         return processor.process(stream);
       } catch (err) {
         console.warn("[VoiceProcessor] Falha no processamento, usando mic raw:", err);
@@ -61,58 +71,37 @@ function uninstallAudioProcessingOverride() {
 }
 
 /**
- * Aplica processamento de áudio para voice rooms (canais de voz)
+ * Aplica processamento de áudio desde o mount do app — garante que está
+ * instalado ANTES que o usuário clique em ativar mic.
  */
-export function useVoiceAudioProcessing(voiceHook: VoiceRoomHook | null) {
-  const activeRef = useRef(false);
-
+export function useGlobalAudioProcessing() {
   useEffect(() => {
-    const connected = voiceHook?.status === "connected";
+    // Instalar IMEDIATAMENTE quando o componente montar
+    installAudioProcessingOverride();
 
-    if (connected && !activeRef.current) {
-      activeRef.current = true;
-      installAudioProcessingOverride();
-    }
-
-    if (!connected && activeRef.current) {
-      activeRef.current = false;
-    }
-  }, [voiceHook?.status]);
-
-  useEffect(() => {
     return () => {
-      activeRef.current = false;
+      // Não remove no unmount — o app inteiro é o lifecycle
     };
   }, []);
 }
 
 /**
- * Aplica processamento de áudio para DM calls (chamadas 1:1)
+ * Mantido para compat — agora o override é global, mas deixamos os hooks
+ * de voice/dm para futuras extensões (ex: ajustar agressividade por contexto).
  */
-export function useDmAudioProcessing(dmCallStatus: string) {
-  const activeRef = useRef(false);
-
+export function useVoiceAudioProcessing(voiceHook: VoiceRoomHook | null) {
   useEffect(() => {
-    const inCall = dmCallStatus === "active" || dmCallStatus === "connecting" || dmCallStatus === "outgoing";
-
-    if (inCall && !activeRef.current) {
-      activeRef.current = true;
-      installAudioProcessingOverride();
-    }
-
-    if (!inCall && activeRef.current) {
-      activeRef.current = false;
-    }
-  }, [dmCallStatus]);
-
-  useEffect(() => {
-    return () => {
-      activeRef.current = false;
-    };
-  }, []);
+    // Nada — o override já é global via useGlobalAudioProcessing
+  }, [voiceHook?.status]);
 }
 
-// Remove override quando NENHUM dos hooks está ativo (chamado pelo app cleanup)
+export function useDmAudioProcessing(dmCallStatus: string) {
+  useEffect(() => {
+    // Nada — o override já é global via useGlobalAudioProcessing
+  }, [dmCallStatus]);
+}
+
+// Remove override quando o app desmonta (cleanup)
 export function cleanupAudioProcessing() {
   uninstallAudioProcessingOverride();
   getAudioProcessor().cleanup();

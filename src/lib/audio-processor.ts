@@ -18,7 +18,7 @@ let globalAudioProcessor: VoiceAudioProcessor | null = null;
 let selectedAudioDeviceId: string | null = null;
 
 export class VoiceAudioProcessor {
-  private audioContext: AudioContext;
+  public audioContext: AudioContext;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private compressor: DynamicsCompressorNode;
   private gainNode: GainNode;
