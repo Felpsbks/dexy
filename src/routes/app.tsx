@@ -1005,7 +1005,6 @@ function AppPage() {
                 </button>
               );
             })()}
-            <div className="w-px h-6 bg-border"></div>
             <AudioDeviceSelector />
             <button
               onClick={() => setDeafened((v) => !v)}
