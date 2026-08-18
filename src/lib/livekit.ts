@@ -8,6 +8,7 @@ import {
   Room,
   RoomEvent,
   Track,
+  VideoCodec,
   VideoPreset,
   type AudioCaptureOptions,
   type RemoteParticipant,
@@ -25,6 +26,11 @@ import { getSelectedAudioDevice } from "./audio-devices";
 // "tinny" mono quality that makes calls sound like a phone call rather than
 // a Discord-level experience.
 const ROOM_PUBLISH_DEFAULTS = {
+  // H.264 provides better compression than VP8 — smaller files / less bandwidth
+  // for the same quality, and is universally supported (Chrome, Firefox, Safari).
+  // VP9 would be marginally better quality but Safari doesn't support it reliably,
+  // and the bitrate savings from H.264 are real.
+  videoCodec: "h264" as VideoCodec,
   audioPreset: AudioPresets.musicHighQualityStereo,
 };
 import { mintDmVoiceToken, mintVoiceToken } from "./livekit-token";
@@ -46,26 +52,37 @@ import type { Database } from "./database.types";
 // VideoCaptureOptions/ConstrainDOMString semantics -- so a camera that can't
 // do 1080p degrades to whatever it actually supports (e.g. 720p) instead of
 // throwing OverconstrainedError; that's the fallback path, no separate probe
-// needed. 1080p/30 measured ~3Mbps with zero packet loss and no quality
+// needed. 1080p/30 measured ~3-4Mbps with zero packet loss and no quality
 // limitation on real infra, well inside typical headroom.
+//
+// 60fps vs 30fps: real human faces in conversation look smoother and more
+// natural at 60fps, but most webcams can't do 1080p/60fps (many cap at
+// 720p/60fps or 1080p/30fps). Requesting 60fps in the constraint makes the
+// browser return the best the hardware can do -- if it only does 30fps at
+// 1080p, you get that. If it does 60fps at 720p, you get that. Either is
+// better than the SDK's silent 30fps cap on everything.
 const CAMERA_CAPTURE_OPTIONS: VideoCaptureOptions = {
-  resolution: { width: 1920, height: 1080, frameRate: 30 },
+  resolution: { width: 1920, height: 1080, frameRate: 60 },
 };
 const CAMERA_PUBLISH_OPTIONS: TrackPublishOptions = {
-  videoEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 },
-  // livekit-client's own default low simulcast layers (used whenever
-  // videoSimulcastLayers isn't set) ship at 20fps -- reasonable for saving
-  // bandwidth on a small grid tile, but the framerate drop reads as stutter,
-  // not just softness (confirmed: a small receiving tile measured ~20fps at
-  // 320x180 against the same 30fps source, vs 30fps when the tile is large
-  // enough to pull the top layer). Same bitrates/resolutions as the SDK
-  // defaults -- adaptiveStream still requests a smaller layer for a small
-  // tile and still saves the same bandwidth -- just framerate raised to
-  // match the top layer so a small tile trades resolution for bandwidth,
-  // not motion smoothness too.
+  // 5Mbps = clean 1080p/30fps, acceptable 1080p/60fps. Most internet
+  // connections handle this fine -- adaptiveStream on the Room means
+  // receivers with poor bandwidth get a smaller layer anyway.
+  videoEncoding: { maxBitrate: 5_000_000, maxFramerate: 60 },
+  // H.264: better compression than VP8/VP9 for the same quality, universally
+  // supported, smaller bitrate = less chop on poor connections.
+  videoCodec: "h264" as VideoCodec,
+  // Simulcast: 3 layers so the server can adapt per-viewer bandwidth.
+  // - 180p/160kbps: very poor connections, mobile data savers
+  // - 360p/450kbps: moderate connections (default LiveKit tile size)
+  // - 720p/1.5Mbps: good connections (full quality when user expands a tile)
+  // The LOCAL participant always publishes the top layer (up to 5Mbps);
+  // simulcast just lets receivers subscribe to a lower layer if they need to.
+  // Higher bitrate on 720p layer = much sharper image at that tile size.
   videoSimulcastLayers: [
-    new VideoPreset(320, 180, 160_000, 30),
-    new VideoPreset(640, 360, 450_000, 30),
+    new VideoPreset(320, 180, 160_000, 20),
+    new VideoPreset(640, 360, 450_000, 25),
+    new VideoPreset(1280, 720, 1_500_000, 30),
   ],
 };
 
