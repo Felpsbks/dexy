@@ -59,8 +59,24 @@ if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function ensureBotAccount() {
+  // Tenta fazer login primeiro
   const signIn = await supabase.auth.signInWithPassword({ email: BOT_EMAIL, password: BOT_PASSWORD });
-  if (!signIn.error) return signIn.data.user.id;
+  if (!signIn.error) {
+    console.log("Bot já existe, fazendo login...");
+    return signIn.data.user.id;
+  }
+
+  // Se o erro não for "usuário não existe", é outro problema
+  if (signIn.error?.status !== 400 || signIn.error?.message?.toLowerCase().includes("invalid login credentials")) {
+    // Tenta buscar o usuário pelo email (método alternativo)
+    console.log("Login falhou, tentando método alternativo...");
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const existingBot = users?.users?.find(u => u.email === BOT_EMAIL);
+    if (existingBot) {
+      console.log("Bot encontrado no sistema, login com senha falhou (verifique DEXY_BOT_PASSWORD).");
+      throw new Error(`Login do bot falhou: ${signIn.error?.message}. Verifique DEXY_BOT_PASSWORD no .env`);
+    }
+  }
 
   console.log("Conta do bot ainda não existe, criando...");
   const signUp = await supabase.auth.signUp({
