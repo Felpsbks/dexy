@@ -78,7 +78,7 @@ const CAMERA_PUBLISH_OPTIONS: TrackPublishOptions = {
 //   disables DTX (which otherwise causes audible "breathing" gaps in silence)
 const MIC_CAPTURE_OPTIONS: AudioCaptureOptions = {
   echoCancellation: true,
-  noiseSuppression: true,
+  noiseSuppression: false, // Desabilitar — vamos usar Web Audio API para mais controle
   autoGainControl: true,
   channelCount: 2,
 };
