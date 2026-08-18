@@ -624,11 +624,12 @@ const STALE_RINGING_MS = 2 * 60 * 1000;
 // crashed, laptop lid closed without graceful disconnect, or the network
 // dropped at the exact moment the cleanup update would fire. Unlike
 // "ringing" (which has a 30s ring timer), "active" calls have no natural
-// expiry. 6 hours matches the LiveKit token TTL so a legitimate ongoing
-// call is never caught while its tokens are still valid — handleUnexpectedDisconnect
-// retries for ~45s before ending the row, and if the network truly dropped
-// forever the user will hang up and reopen on their own before this fires.
-const STALE_ACTIVE_MS = 6 * 60 * 60 * 1000;
+// expiry. 5 minutes is generous enough that no legitimate ongoing call would
+// ever be caught (a real call has at least one participant connected to the
+// LiveKit room, and if they drop, handleUnexpectedDisconnect retries for
+// ~45s before ending the row), but short enough that the user isn't stuck
+// for hours unable to call again.
+const STALE_ACTIVE_MS = 5 * 60 * 1000;
 
 async function expireStaleCall(conversationId: string): Promise<void> {
   const { data } = await supabase
