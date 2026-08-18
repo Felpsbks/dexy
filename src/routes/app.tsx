@@ -105,10 +105,6 @@ import {
   setSoundEnabled,
 } from "@/lib/callSounds";
 import {
-  useDmAudioProcessing,
-  useVoiceAudioProcessing,
-} from "@/lib/voice-processing-hooks";
-import {
   avatarFor,
   formatFileSize,
   resolvePresenceStatus,
@@ -296,8 +292,6 @@ function AppPage() {
   const [activeDmProfile, setActiveDmProfile] = useState<Profile | undefined>(undefined);
   const [deafened, setDeafened] = useState(false);
   const [activeVoice, setActiveVoice] = useState<VoiceRoomHook | null>(null);
-  // Aplicar processamento de áudio avançado nas voice rooms
-  useVoiceAudioProcessing(activeVoice);
 
   // The call itself lives here, above any single conversation view, so it
   // survives switching conversations or leaving DM mode entirely — it used
@@ -313,8 +307,6 @@ function AppPage() {
   useScreenShareSound(dmCall.screenShareEnabled);
   useMuteToggleSound(dmCall.status !== "idle" && !dmCall.micEnabled);
   useMuteToggleSound(deafened);
-  // Aplicar processamento de áudio avançado nas DM calls
-  useDmAudioProcessing(dmCall.status);
   useEffect(() => {
     if (dmCall.status === "idle") setCallConversationId(activeConversationId);
   }, [activeConversationId, dmCall.status]);

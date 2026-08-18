@@ -12,7 +12,6 @@ import {
   getSelectedAudioDevice,
   saveSelectedAudioDevice,
 } from "@/lib/audio-devices";
-import { setAudioDevice } from "@/lib/audio-processor";
 
 /**
  * Seletor de dispositivo de áudio (microfone)
@@ -38,7 +37,6 @@ export function AudioDeviceSelector() {
         const selected = await getSelectedAudioDevice();
         const deviceId = selected?.deviceId || best.deviceId;
         setSelectedDeviceId(deviceId);
-        setAudioDevice(deviceId);
       }
 
       setLoading(false);
@@ -55,7 +53,6 @@ export function AudioDeviceSelector() {
   const handleSelect = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
     saveSelectedAudioDevice(deviceId);
-    setAudioDevice(deviceId);
     setOpen(false);
   };
 
@@ -95,7 +92,9 @@ export function AudioDeviceSelector() {
               >
                 <div className="flex-1 truncate">{device.label}</div>
                 {isBest && (
-                  <Volume2 className="w-3.5 h-3.5 text-green-500 shrink-0" title="Melhor qualidade" />
+                  <span title="Melhor qualidade" className="shrink-0">
+                    <Volume2 className="w-3.5 h-3.5 text-green-500" />
+                  </span>
                 )}
                 {isSelected && (
                   <div className="w-2 h-2 rounded-full bg-primary shrink-0" />

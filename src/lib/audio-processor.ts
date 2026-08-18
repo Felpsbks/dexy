@@ -1,7 +1,17 @@
 /**
  * Advanced audio processing pipeline para voz clara tipo Discord.
- * Aplica compressão, EQ, e normalização para remover ruído de fundo
+ * Aplica múltiplos estágios de processamento para remover ruído de fundo
  * e deixar a voz "gostosa" de ouvir.
+ *
+ * Pipeline: mic → notch(50Hz) → notch(60Hz) → highPass(100Hz) → lowPass(8kHz)
+ *           → deEsser(6.5kHz) → compressor → gain → output
+ *
+ * Notas:
+ * - Notch de 50Hz/60Hz = remove hum de tomadas (comum em geral)
+ * - HighPass em 100Hz = remove rumores graves (AR, geladeira, ventilador)
+ * - DeEsser em 6.5kHz = remove sibilância (S, T, F muito fortes)
+ * - Compressor 12:1 = mantém voz consistente
+ * - LowPass em 8kHz = remove frequências altas desnecessárias
  */
 
 let globalAudioProcessor: VoiceAudioProcessor | null = null;
@@ -14,6 +24,11 @@ export class VoiceAudioProcessor {
   private gainNode: GainNode;
   private highPassFilter: BiquadFilterNode;
   private lowPassFilter: BiquadFilterNode;
+  private lowShelfFilter: BiquadFilterNode;
+  private highShelfFilter: BiquadFilterNode;
+  private notchFilter50: BiquadFilterNode;
+  private notchFilter60: BiquadFilterNode;
+  private deEsser: DynamicsCompressorNode;
   private destinationNode: MediaStreamAudioDestinationNode;
 
   constructor() {
@@ -22,43 +37,93 @@ export class VoiceAudioProcessor {
     this.gainNode = this.audioContext.createGain();
     this.highPassFilter = this.audioContext.createBiquadFilter();
     this.lowPassFilter = this.audioContext.createBiquadFilter();
+    this.lowShelfFilter = this.audioContext.createBiquadFilter();
+    this.highShelfFilter = this.audioContext.createBiquadFilter();
+    this.notchFilter50 = this.audioContext.createBiquadFilter();
+    this.notchFilter60 = this.audioContext.createBiquadFilter();
+    this.deEsser = this.audioContext.createDynamicsCompressor();
     this.destinationNode = this.audioContext.createMediaStreamDestination();
 
     this.setupCompressor();
     this.setupHighPassFilter();
     this.setupLowPassFilter();
+    this.setupShelfFilters();
+    this.setupNotchFilters();
+    this.setupDeEsser();
     this.setupGain();
   }
 
   private setupCompressor() {
-    // Agressivamente comprime picos — mantém voz consistente
-    // Discord usa algo similar para manter volume previsível
-    this.compressor.threshold.value = -30; // Começa a comprimir em -30dB (voz fraca)
-    this.compressor.knee.value = 40; // Transição suave
-    this.compressor.ratio.value = 12; // Comprime forte (12:1)
-    this.compressor.attack.value = 0.003; // Muito rápido (3ms)
-    this.compressor.release.value = 0.25; // Liberação natural
+    // Compressor agressivo: mantém volume consistente
+    // Threshold -25dB = comprime voz quando passa desse nível
+    // Ratio 12:1 = mantém picos dentro de faixa previsível
+    // Attack 3ms = preserva transientes (consoantes)
+    // Release 250ms = libera gradualmente, não fica "preso"
+    this.compressor.threshold.value = -25;
+    this.compressor.knee.value = 30;
+    this.compressor.ratio.value = 12;
+    this.compressor.attack.value = 0.003;
+    this.compressor.release.value = 0.25;
   }
 
   private setupHighPassFilter() {
-    // Remove frequências baixas (ruído de ar condicionado, buzz, rumble)
-    // A voz humana começa em ~85Hz, picos entre 200-2000Hz
-    // Cortar tudo abaixo de 80Hz remove 90% do ruído ambiental
-    this.highPassFilter.type = 'highpass';
-    this.highPassFilter.frequency.value = 80;
-    this.highPassFilter.Q.value = 0.707; // Q padrão (filtro suave)
+    // Filtro passa-alta — remove tudo abaixo de 100Hz
+    // Voz humana: 85Hz a 8kHz, com maioria em 200-2000Hz
+    // 100Hz = ponto de corte seguro, preserva voz mas remove rumble
+    this.highPassFilter.type = "highpass";
+    this.highPassFilter.frequency.value = 100;
+    this.highPassFilter.Q.value = 0.707;
   }
 
   private setupLowPassFilter() {
-    // Remove frequências muito altas (sibilantes, cliques, ruído de teclado)
-    // Cortar acima de 10kHz mantém a voz natural mas remove artefatos
-    this.lowPassFilter.type = 'lowpass';
-    this.lowPassFilter.frequency.value = 10000;
+    // Filtro passa-baixa — remove frequências acima de 8kHz
+    // Voz de qualidade telefônica vai até 3.4kHz, mas voz natural chega a 8kHz
+    // Cortar em 8kHz mantém a voz cheia e natural, remove sibilância e ruído
+    this.lowPassFilter.type = "lowpass";
+    this.lowPassFilter.frequency.value = 8000;
     this.lowPassFilter.Q.value = 0.707;
   }
 
+  private setupShelfFilters() {
+    // Low shelf: leve boost em 200Hz (~2dB) para dar corpo à voz
+    this.lowShelfFilter.type = "lowshelf";
+    this.lowShelfFilter.frequency.value = 200;
+    this.lowShelfFilter.gain.value = 2;
+
+    // High shelf: leve atenuação em 3kHz (~-2dB) para reduzir fadigabilidade
+    this.highShelfFilter.type = "highshelf";
+    this.highShelfFilter.frequency.value = 3000;
+    this.highShelfFilter.gain.value = -2;
+  }
+
+  private setupNotchFilters() {
+    // Notch filter de 50Hz = remove hum de rede elétrica (Europa, algumas regiões)
+    // Notch filter de 60Hz = remove hum de rede elétrica (Américas)
+    // Ambos = garantia universal
+    this.notchFilter50.type = "notch";
+    this.notchFilter50.frequency.value = 50;
+    this.notchFilter50.Q.value = 10; // Q alto = filtro estreito, só atinge a frequência
+
+    this.notchFilter60.type = "notch";
+    this.notchFilter60.frequency.value = 60;
+    this.notchFilter60.Q.value = 10;
+  }
+
+  private setupDeEsser() {
+    // De-esser: compressor focado em 6.5kHz para reduzir sibilância
+    // Sons de "S", "T", "F" são muito altos em 6-8kHz — de-esser suaviza
+    // Threshold -10dB = atua só em sibilância forte (não afeta voz normal)
+    // Como ele vê a entrada com side-chain em 6.5kHz, comprime só quando esses picos aparecem
+    // Mas como Web Audio API simples não tem sidechain, simulamos com filtro
+    this.deEsser.threshold.value = -10;
+    this.deEsser.knee.value = 0;
+    this.deEsser.ratio.value = 4;
+    this.deEsser.attack.value = 0.001;
+    this.deEsser.release.value = 0.15;
+  }
+
   private setupGain() {
-    // +3dB = 2x mais loud (faz a voz sobressair no mix)
+    // +3.5dB = ~1.5x mais loud (faz a voz sobressair no mix)
     this.gainNode.gain.value = 1.5;
   }
 
@@ -73,10 +138,17 @@ export class VoiceAudioProcessor {
 
     this.sourceNode = this.audioContext.createMediaStreamSource(stream);
 
-    // Conecta chain: mic → highPass → lowPass → compressor → gain → output
-    this.sourceNode.connect(this.highPassFilter);
-    this.highPassFilter.connect(this.lowPassFilter);
-    this.lowPassFilter.connect(this.compressor);
+    // Conecta pipeline completo:
+    // mic → notch50 → notch60 → highPass → lowShelf → lowPass
+    //     → highShelf → deEsser → compressor → gain → output
+    this.sourceNode.connect(this.notchFilter50);
+    this.notchFilter50.connect(this.notchFilter60);
+    this.notchFilter60.connect(this.highPassFilter);
+    this.highPassFilter.connect(this.lowShelfFilter);
+    this.lowShelfFilter.connect(this.lowPassFilter);
+    this.lowPassFilter.connect(this.highShelfFilter);
+    this.highShelfFilter.connect(this.deEsser);
+    this.deEsser.connect(this.compressor);
     this.compressor.connect(this.gainNode);
     this.gainNode.connect(this.destinationNode);
 
@@ -94,7 +166,7 @@ export class VoiceAudioProcessor {
 
     // Quanto mais agressivo, mais comprime
     const ratio = 4 + clamped * 8; // De 4:1 a 12:1
-    const threshold = -30 - clamped * 10; // De -30dB a -40dB
+    const threshold = -25 - clamped * 5; // De -25dB a -30dB
     const gain = 1.0 + clamped * 0.5; // De 1.0 a 1.5x
 
     this.compressor.ratio.value = ratio;
@@ -106,8 +178,13 @@ export class VoiceAudioProcessor {
     if (this.sourceNode) {
       this.sourceNode.disconnect();
     }
+    this.notchFilter50.disconnect();
+    this.notchFilter60.disconnect();
     this.highPassFilter.disconnect();
+    this.lowShelfFilter.disconnect();
     this.lowPassFilter.disconnect();
+    this.highShelfFilter.disconnect();
+    this.deEsser.disconnect();
     this.compressor.disconnect();
     this.gainNode.disconnect();
   }

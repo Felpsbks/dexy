@@ -14,6 +14,8 @@ import {
   type TrackPublishOptions,
   type VideoCaptureOptions,
 } from "livekit-client";
+import { isKrispNoiseFilterSupported, KrispNoiseFilter } from "@livekit/krisp-noise-filter";
+import { getSelectedAudioDevice } from "./audio-devices";
 
 // Discord uses ~128kbps Opus for voice channels. LiveKit's
 // musicHighQualityStereo preset matches that: 128kbps stereo, which gives a
@@ -71,17 +73,39 @@ const CAMERA_PUBLISH_OPTIONS: TrackPublishOptions = {
 // on every mic capture — relying on browser defaults isn't reliable across
 // Chrome/Firefox/Safari. Configured for voice clarity similar to Discord:
 // - echoCancellation: aggressive removal of echo from speakers
-// - noiseSuppression: strong background noise reduction (fan, AC, traffic)
+// - noiseSuppression: browser-level background noise reduction, acts as the
+//   baseline/fallback for browsers where the Krisp processor below isn't
+//   supported (Firefox, Safari, mobile)
 // - autoGainControl: normalize volume across speakers (prevents sudden loud spikes)
 // - channelCount 2: stereo capture when hardware supports it — together with
 //   the musicHighQualityStereo preset this gives a richer, fuller sound and
 //   disables DTX (which otherwise causes audible "breathing" gaps in silence)
-const MIC_CAPTURE_OPTIONS: AudioCaptureOptions = {
+const MIC_CAPTURE_BASE_OPTIONS: AudioCaptureOptions = {
   echoCancellation: true,
-  noiseSuppression: false, // Desabilitar — vamos usar Web Audio API para mais controle
+  noiseSuppression: true,
   autoGainControl: true,
   channelCount: 2,
 };
+
+// Builds the actual per-connect/per-toggle mic options: base constraints
+// above, plus Krisp's ML noise-suppression model (same tier Discord itself
+// partly relies on) layered on top of the browser's own suppression, plus
+// Chromium's experimental voiceIsolation constraint as a second line of
+// defense, plus whichever input device the user picked in
+// AudioDeviceSelector. Built fresh on every call (not module-level) so a
+// device switch or Krisp-support check made after the module first loaded is
+// always picked up. Falls back gracefully — Krisp/voiceIsolation are simply
+// omitted/ignored when unsupported, device selection falls back to
+// getSelectedAudioDevice()'s own auto-detect, so the mic always still works.
+async function buildMicCaptureOptions(): Promise<AudioCaptureOptions> {
+  const selected = await getSelectedAudioDevice().catch(() => null);
+  return {
+    ...MIC_CAPTURE_BASE_OPTIONS,
+    voiceIsolation: true,
+    ...(selected ? { deviceId: selected.deviceId } : {}),
+    ...(isKrispNoiseFilterSupported() ? { processor: KrispNoiseFilter({ quality: "medium" }) } : {}),
+  };
+}
 
 // getUserMedia/getDisplayMedia reject with a DOMException whose .name is one
 // of a small fixed set — the raw .message is browser-specific engineering
@@ -408,7 +432,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
         adaptiveStream: true,
         dynacast: true,
         publishDefaults: ROOM_PUBLISH_DEFAULTS,
-        audioCaptureDefaults: MIC_CAPTURE_OPTIONS,
+        audioCaptureDefaults: MIC_CAPTURE_BASE_OPTIONS,
       });
       // Connecting fires a burst of these in the same instant (participant
       // joined, mic track published/subscribed, ...) — without coalescing,
@@ -440,7 +464,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
         });
 
       await room.connect(url, token);
-      await room.localParticipant.setMicrophoneEnabled(micPrefRef.current, MIC_CAPTURE_OPTIONS);
+      await room.localParticipant.setMicrophoneEnabled(micPrefRef.current, await buildMicCaptureOptions());
 
       roomRef.current = room;
       forceTick();
@@ -523,7 +547,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     if (!room) return;
     const enabled = room.localParticipant.isMicrophoneEnabled;
     try {
-      await room.localParticipant.setMicrophoneEnabled(!enabled, MIC_CAPTURE_OPTIONS);
+      await room.localParticipant.setMicrophoneEnabled(!enabled, await buildMicCaptureOptions());
       // Only remember the new preference (and clear any earlier error) once
       // the SDK call actually succeeded -- previously this ran unconditionally
       // before the await even settled, so a rejected toggle (permission
@@ -772,7 +796,7 @@ export function useDmCall(
         adaptiveStream: true,
         dynacast: true,
         publishDefaults: ROOM_PUBLISH_DEFAULTS,
-        audioCaptureDefaults: MIC_CAPTURE_OPTIONS,
+        audioCaptureDefaults: MIC_CAPTURE_BASE_OPTIONS,
       });
       const tick = throttleTrailing(forceTick, 200);
       room
@@ -798,7 +822,7 @@ export function useDmCall(
         });
 
       await room.connect(url, token);
-      await room.localParticipant.setMicrophoneEnabled(micPrefRef.current, MIC_CAPTURE_OPTIONS);
+      await room.localParticipant.setMicrophoneEnabled(micPrefRef.current, await buildMicCaptureOptions());
       if (callRef.current?.kind === "video") {
         // A camera failure (busy, missing, denied) shouldn't kill an otherwise
         // working audio call — fall back to audio-only instead of aborting.
@@ -1101,7 +1125,7 @@ export function useDmCall(
     if (!room) return;
     const enabled = !room.localParticipant.isMicrophoneEnabled;
     try {
-      await room.localParticipant.setMicrophoneEnabled(enabled, MIC_CAPTURE_OPTIONS);
+      await room.localParticipant.setMicrophoneEnabled(enabled, await buildMicCaptureOptions());
       // Same ordering fix as useVoiceRoom.toggleMic: only commit the new
       // preference after the SDK call actually succeeds.
       micPrefRef.current = enabled;
