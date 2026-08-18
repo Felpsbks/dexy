@@ -71,6 +71,20 @@ async function publishRawTrack(mediaStreamTrack, encoding, videoCodec) {
   return true;
 }
 
+// Same as publishRawTrack but exposes the extra publish options (simulcast,
+// custom layers) needed for the stack-levers comparison (simulcast on/off,
+// VP9, etc) without hardcoding simulcast:false.
+async function publishRawTrackAdvanced(mediaStreamTrack, opts) {
+  await room.localParticipant.publishTrack(mediaStreamTrack, {
+    videoEncoding: opts.encoding,
+    simulcast: !!opts.simulcast,
+    source: Track.Source.ScreenShare,
+    ...(opts.videoCodec ? { videoCodec: opts.videoCodec } : {}),
+    ...(opts.videoSimulcastLayers ? { videoSimulcastLayers: opts.videoSimulcastLayers } : {}),
+  });
+  return true;
+}
+
 async function publishScreenShare(opts) {
   const captureOptions = {
     audio: false,
@@ -129,6 +143,14 @@ function startAnimatedCanvas() {
   requestAnimationFrame(draw);
 }
 
+// Public livekit-client API surface: LocalTrackPublication.track is a
+// LocalVideoTrack (both exported from the package root), whose `.sender`
+// getter is public (not an internal/private field) -- this is the exact
+// path a production fix would use, no private APIs involved.
+function getScreenShareSender() {
+  return room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.sender;
+}
+
 function getLocalTrackSettings(source) {
   const pub = room.localParticipant.getTrackPublication(
     source === "screen_share" ? Track.Source.ScreenShare : Track.Source.Camera,
@@ -166,6 +188,8 @@ window.__harness = {
   publishCamera,
   publishScreenShare,
   publishRawTrack,
+  publishRawTrackAdvanced,
+  getScreenShareSender,
   getLocalTrackSettings,
   getRenderStats,
   disconnectAll,

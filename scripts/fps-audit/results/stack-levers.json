@@ -1,0 +1,105 @@
+[
+  {
+    "scenario": "reapply_same_maxframerate",
+    "label": "setParameters() reafirmando SÓ maxFramerate:60 (mesmo valor já configurado, nada novo)",
+    "senderTweak": {
+      "ok": true,
+      "appliedTo": [
+        {
+          "active": true,
+          "adaptivePtime": false,
+          "maxBitrate": 2500000,
+          "maxFramerate": 60,
+          "networkPriority": "low",
+          "priority": "medium"
+        }
+      ]
+    },
+    "encodeFps": 60.053513031414134,
+    "decodeFps": 60.053513031414134,
+    "resSent": "1920x1080",
+    "bitrateKbps": 2505.409572886731,
+    "qualityLimitationReason": "none",
+    "activeEncodings": [
+      "encodingIndex"
+    ]
+  },
+  {
+    "scenario": "degradation_only_no_maxfr",
+    "label": "SÓ degradationPreference='maintain-framerate', sem reafirmar maxFramerate",
+    "senderTweak": {
+      "ok": true,
+      "appliedTo": [
+        {
+          "active": true,
+          "adaptivePtime": false,
+          "maxBitrate": 2500000,
+          "maxFramerate": 15,
+          "networkPriority": "low",
+          "priority": "medium",
+          "degradationPreference": "maintain-framerate"
+        }
+      ]
+    },
+    "encodeFps": 15.065913370998116,
+    "decodeFps": 15.065913370998116,
+    "resSent": "1920x1080",
+    "bitrateKbps": 2202.8157399147585,
+    "qualityLimitationReason": "none",
+    "activeEncodings": [
+      "encodingIndex"
+    ]
+  },
+  {
+    "scenario": "vp9_with_setparams",
+    "label": "VP9 + setParameters(maxFramerate:60) -- confirma se a técnica funciona em outro codec",
+    "senderTweak": {
+      "ok": true,
+      "appliedTo": [
+        {
+          "active": true,
+          "adaptivePtime": false,
+          "maxBitrate": 2500000,
+          "maxFramerate": 60,
+          "networkPriority": "medium",
+          "priority": "medium",
+          "scalabilityMode": "L1T3"
+        }
+      ]
+    },
+    "encodeFps": 58.78264323304538,
+    "decodeFps": 58.78264323304538,
+    "resSent": "1920x1080",
+    "bitrateKbps": 2493.692384073081,
+    "qualityLimitationReason": "none",
+    "activeEncodings": [
+      "encodingIndex"
+    ]
+  },
+  {
+    "scenario": "1080p120_with_setparams",
+    "label": "1080p120 + setParameters(maxFramerate:120) -- o teste que realmente importa pro objetivo",
+    "senderTweak": {
+      "ok": true,
+      "appliedTo": [
+        {
+          "active": true,
+          "adaptivePtime": false,
+          "maxBitrate": 2500000,
+          "maxFramerate": 120,
+          "networkPriority": "low",
+          "priority": "medium",
+          "degradationPreference": "maintain-framerate"
+        }
+      ]
+    },
+    "encodeFps": 85.96612855303556,
+    "decodeFps": 86.461325146083,
+    "resSent": "1920x1080",
+    "bitrateKbps": 2478.5080717044666,
+    "qualityLimitationReason": "none",
+    "activeEncodings": [
+      "encodingIndex"
+    ]
+  }
+]

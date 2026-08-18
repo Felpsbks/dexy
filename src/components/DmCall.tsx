@@ -68,7 +68,16 @@ function TrackAudio({ track, muted }: { track: Track | undefined; muted?: boolea
       track.detach(el);
     };
   }, [track]);
-  return <audio ref={ref} autoPlay muted={muted} />;
+  return (
+    <audio
+      ref={ref}
+      autoPlay
+      muted={muted}
+      // Audio element optimizations for voice clarity
+      playsInline
+      crossOrigin="anonymous"
+    />
+  );
 }
 
 // Fullscreens the target container (not just the <video>) so overlays like

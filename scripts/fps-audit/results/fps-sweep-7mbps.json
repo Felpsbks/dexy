@@ -1,0 +1,130 @@
+[
+  {
+    "scenario": "sweep7_60",
+    "requestedFps": 60,
+    "prodMaxBitrate": 7000000,
+    "deviceId": "web-contents-media-stream://5:8",
+    "captureFpsDuringMeasurement": 59.996808680389336,
+    "senderBeforeFix": {
+      "maxFramerate": 15,
+      "maxBitrate": 2500000
+    },
+    "senderAfterFix": {
+      "maxFramerate": 60,
+      "maxBitrate": 7000000
+    },
+    "encodeFps": 59.569828526117554,
+    "decodeFps": 59.9662999306175,
+    "renderFps": 59.9662999306175,
+    "resSent": "1920x1080",
+    "bitrateKbps": 6587.8069184260075,
+    "codec": "video/VP8",
+    "qualityLimitationReason": "none",
+    "qualityLimitationDurations": {
+      "bandwidth": 0,
+      "cpu": 0,
+      "none": 17.472,
+      "other": 0
+    },
+    "packetsLost": 0,
+    "jitterMs": 1.5000000000000002,
+    "rttMs": 5.166666666666667,
+    "cpuCoresEquivalent": 2.3934897079942554
+  },
+  {
+    "scenario": "sweep7_75",
+    "requestedFps": 75,
+    "prodMaxBitrate": 7000000,
+    "deviceId": "web-contents-media-stream://5:8",
+    "captureFpsDuringMeasurement": 75.01405509597622,
+    "senderBeforeFix": {
+      "maxFramerate": 15,
+      "maxBitrate": 2500000
+    },
+    "senderAfterFix": {
+      "maxFramerate": 75,
+      "maxBitrate": 7000000
+    },
+    "encodeFps": 74.76913911230265,
+    "decodeFps": 84.50004964750273,
+    "renderFps": 84.50004964750273,
+    "resSent": "1920x1080",
+    "bitrateKbps": 6969.356766954622,
+    "codec": "video/VP8",
+    "qualityLimitationReason": "none",
+    "qualityLimitationDurations": {
+      "bandwidth": 0,
+      "cpu": 0,
+      "none": 17.475,
+      "other": 0
+    },
+    "packetsLost": 0,
+    "jitterMs": 2.3333333333333335,
+    "rttMs": 4.5,
+    "cpuCoresEquivalent": 2.891334029395229
+  },
+  {
+    "scenario": "sweep7_90",
+    "requestedFps": 90,
+    "prodMaxBitrate": 7000000,
+    "deviceId": "web-contents-media-stream://5:8",
+    "captureFpsDuringMeasurement": 87.50198507225663,
+    "senderBeforeFix": {
+      "maxFramerate": 15,
+      "maxBitrate": 2500000
+    },
+    "senderAfterFix": {
+      "maxFramerate": 90,
+      "maxBitrate": 7000000
+    },
+    "encodeFps": 89.88207313447627,
+    "decodeFps": 99.5936973540779,
+    "renderFps": 99.5936973540779,
+    "resSent": "1920x1080",
+    "bitrateKbps": 7013.735804181944,
+    "codec": "video/VP8",
+    "qualityLimitationReason": "none",
+    "qualityLimitationDurations": {
+      "bandwidth": 0,
+      "cpu": 0,
+      "none": 17.554,
+      "other": 0
+    },
+    "packetsLost": 0,
+    "jitterMs": 3.0000000000000004,
+    "rttMs": 5,
+    "cpuCoresEquivalent": 3.970144513260283
+  },
+  {
+    "scenario": "sweep7_120",
+    "requestedFps": 120,
+    "prodMaxBitrate": 7000000,
+    "deviceId": "web-contents-media-stream://5:8",
+    "captureFpsDuringMeasurement": 116.22995698083692,
+    "senderBeforeFix": {
+      "maxFramerate": 15,
+      "maxBitrate": 2500000
+    },
+    "senderAfterFix": {
+      "maxFramerate": 120,
+      "maxBitrate": 7000000
+    },
+    "encodeFps": 109.39816187370293,
+    "decodeFps": 120.36762525941299,
+    "renderFps": 120.36762525941299,
+    "resSent": "1920x1080",
+    "bitrateKbps": 6471.91303488487,
+    "codec": "video/VP8",
+    "qualityLimitationReason": "none",
+    "qualityLimitationDurations": {
+      "bandwidth": 0,
+      "cpu": 0,
+      "none": 17.818,
+      "other": 0
+    },
+    "packetsLost": 0,
+    "jitterMs": 4.166666666666667,
+    "rttMs": 5.5,
+    "cpuCoresEquivalent": 5.631599530700039
+  }
+]

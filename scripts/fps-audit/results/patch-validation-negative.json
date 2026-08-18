@@ -1,0 +1,96 @@
+{
+  "negativeTest": true,
+  "steps": {
+    "firstShare": {
+      "encodeFps": 15.03461918892186,
+      "decodeFps": 15.03461918892186,
+      "resSent": "1920x1080",
+      "bitrateKbps": 707.0876360039565,
+      "qualityLimitationReason": "none",
+      "packetsLost": 0,
+      "jitterMs": 1,
+      "rttMs": 4,
+      "audioFlowing": true,
+      "audioPacketsSent": 824
+    },
+    "firstShareSenderParams": [
+      {
+        "trackLabel": "fake_device_0",
+        "encodings": [
+          {
+            "rid": "q",
+            "active": true,
+            "adaptivePtime": false,
+            "maxBitrate": 160000,
+            "maxFramerate": 30,
+            "networkPriority": "low",
+            "priority": "low",
+            "scaleResolutionDownBy": 6
+          },
+          {
+            "rid": "h",
+            "active": true,
+            "adaptivePtime": false,
+            "maxBitrate": 450000,
+            "maxFramerate": 30,
+            "networkPriority": "low",
+            "priority": "low",
+            "scaleResolutionDownBy": 3
+          },
+          {
+            "rid": "f",
+            "active": true,
+            "adaptivePtime": false,
+            "maxBitrate": 3000000,
+            "maxFramerate": 30,
+            "networkPriority": "low",
+            "priority": "low",
+            "scaleResolutionDownBy": 1
+          }
+        ]
+      },
+      {
+        "trackLabel": "screen:-3:0",
+        "encodings": [
+          {
+            "active": true,
+            "adaptivePtime": false,
+            "maxBitrate": 2500000,
+            "maxFramerate": 15,
+            "networkPriority": "low",
+            "priority": "medium"
+          }
+        ]
+      }
+    ],
+    "stoppedOk": true,
+    "restarted": {
+      "encodeFps": 14.929056138186304,
+      "decodeFps": 14.929056138186304,
+      "resSent": "1920x1080",
+      "bitrateKbps": 702.1719925971622,
+      "qualityLimitationReason": "none",
+      "packetsLost": 0,
+      "jitterMs": 0.8,
+      "rttMs": 4.4,
+      "audioFlowing": true,
+      "audioPacketsSent": 922
+    },
+    "afterSwap": {
+      "encodeFps": 14.962285149004575,
+      "decodeFps": 14.962285149004575,
+      "resSent": "1920x1080",
+      "bitrateKbps": 493.80783974279706,
+      "qualityLimitationReason": "none",
+      "packetsLost": 0,
+      "jitterMs": 1.2000000000000002,
+      "rttMs": 4,
+      "audioFlowing": true,
+      "audioPacketsSent": 922
+    },
+    "toggleCameraMicNoRegression": {
+      "stillSharing": true,
+      "stillInCall": true
+    }
+  }
+}

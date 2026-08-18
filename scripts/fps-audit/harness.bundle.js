@@ -29859,6 +29859,16 @@
     });
     return true;
   }
+  async function publishRawTrackAdvanced(mediaStreamTrack, opts) {
+    await room.localParticipant.publishTrack(mediaStreamTrack, {
+      videoEncoding: opts.encoding,
+      simulcast: !!opts.simulcast,
+      source: Track.Source.ScreenShare,
+      ...opts.videoCodec ? { videoCodec: opts.videoCodec } : {},
+      ...opts.videoSimulcastLayers ? { videoSimulcastLayers: opts.videoSimulcastLayers } : {}
+    });
+    return true;
+  }
   async function publishScreenShare(opts) {
     const captureOptions = {
       audio: false,
@@ -29911,6 +29921,9 @@
     }
     requestAnimationFrame(draw);
   }
+  function getScreenShareSender() {
+    return room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track?.sender;
+  }
   function getLocalTrackSettings(source) {
     const pub = room.localParticipant.getTrackPublication(
       source === "screen_share" ? Track.Source.ScreenShare : Track.Source.Camera
@@ -29944,6 +29957,8 @@
     publishCamera,
     publishScreenShare,
     publishRawTrack,
+    publishRawTrackAdvanced,
+    getScreenShareSender,
     getLocalTrackSettings,
     getRenderStats,
     disconnectAll,

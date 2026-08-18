@@ -15,11 +15,16 @@ import {
   type VideoCaptureOptions,
 } from "livekit-client";
 
-// LiveKit's own Room default (AudioPresets.music, 48kbps) already beats the
-// generic "speech" preset, but musicHighQuality (96kbps) is a clearly
-// audible step up for voice with no real downside on typical connections —
-// same idea as the screen-share bitrate bump above, just for mic audio.
-const ROOM_PUBLISH_DEFAULTS = { audioPreset: AudioPresets.musicHighQuality };
+// Discord uses ~128kbps Opus for voice channels. LiveKit's
+// musicHighQualityStereo preset matches that: 128kbps stereo, which gives a
+// noticeably fuller, cleaner sound compared to the mono 96kbps
+// musicHighQuality preset. The stereo field is subtle for voice but helps
+// spatial separation when multiple people talk, and eliminates the slightly
+// "tinny" mono quality that makes calls sound like a phone call rather than
+// a Discord-level experience.
+const ROOM_PUBLISH_DEFAULTS = {
+  audioPreset: AudioPresets.musicHighQualityStereo,
+};
 import { mintDmVoiceToken, mintVoiceToken } from "./livekit-token";
 import { supabase } from "./supabase";
 import type { Database } from "./database.types";
@@ -64,12 +69,18 @@ const CAMERA_PUBLISH_OPTIONS: TrackPublishOptions = {
 
 // Forces the browser's own echo cancellation / noise suppression / auto gain
 // on every mic capture — relying on browser defaults isn't reliable across
-// Chrome/Firefox/Safari, and this is most of what makes Discord's voice
-// sound "clean" without any extra processing library.
+// Chrome/Firefox/Safari. Configured for voice clarity similar to Discord:
+// - echoCancellation: aggressive removal of echo from speakers
+// - noiseSuppression: strong background noise reduction (fan, AC, traffic)
+// - autoGainControl: normalize volume across speakers (prevents sudden loud spikes)
+// - channelCount 2: stereo capture when hardware supports it — together with
+//   the musicHighQualityStereo preset this gives a richer, fuller sound and
+//   disables DTX (which otherwise causes audible "breathing" gaps in silence)
 const MIC_CAPTURE_OPTIONS: AudioCaptureOptions = {
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
+  channelCount: 2,
 };
 
 // getUserMedia/getDisplayMedia reject with a DOMException whose .name is one
@@ -355,6 +366,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
         adaptiveStream: true,
         dynacast: true,
         publishDefaults: ROOM_PUBLISH_DEFAULTS,
+        audioCaptureDefaults: MIC_CAPTURE_OPTIONS,
       });
       // Connecting fires a burst of these in the same instant (participant
       // joined, mic track published/subscribed, ...) — without coalescing,
@@ -718,11 +730,8 @@ export function useDmCall(
         adaptiveStream: true,
         dynacast: true,
         publishDefaults: ROOM_PUBLISH_DEFAULTS,
+        audioCaptureDefaults: MIC_CAPTURE_OPTIONS,
       });
-      // See useVoiceRoom's connectRoom for why this is throttled, not direct:
-      // connecting fires a burst of these in the same instant, and each one
-      // used to be its own synchronous re-render landing right as the call
-      // view mounts — exactly when someone is likely to start scrolling.
       const tick = throttleTrailing(forceTick, 200);
       room
         .on(RoomEvent.ParticipantConnected, tick)
