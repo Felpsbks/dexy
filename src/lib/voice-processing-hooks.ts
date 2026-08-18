@@ -1,13 +1,15 @@
 /**
  * Hook para aplicar processamento de áudio avançado em chamadas de voz.
- * Intercepta getUserMedia para aplicar processamento Web Audio API
- * ANTES do LiveKit SDK publicar a track.
+ * Intercepta getUserMedia para:
+ * 1. Forçar o deviceId selecionado pelo usuário (não pegar mic da câmera)
+ * 2. Aplicar processamento Web Audio API (compressão, EQ, filtros)
  *
- * Cadeia: mic → highPass → lowPass → compressor → gain → LiveKit
+ * Cadeia: mic correto → highPass → lowPass → compressor → gain → LiveKit
  */
 
 import { useEffect, useRef } from "react";
 import { getAudioProcessor } from "./audio-processor";
+import { getSelectedAudioDevice } from "./audio-devices";
 import type { VoiceRoomHook } from "./livekit";
 
 // Singleton: garante que só override uma vez mesmo com múltiplos hooks
@@ -23,11 +25,21 @@ function installAudioProcessingOverride() {
   navigator.mediaDevices.getUserMedia = async function (
     constraints?: MediaStreamConstraints,
   ): Promise<MediaStream> {
-    const stream = await originalGetUserMedia!(constraints);
-
     // Só processa se é audio-only request (não processa video+audio combinado
     // porque isso é camera/screenshare, não mic isolado)
     if (constraints?.audio && !constraints?.video) {
+      // Injetar o deviceId selecionado pelo usuário
+      const selectedDevice = await getSelectedAudioDevice();
+      if (selectedDevice) {
+        const audioConstraints =
+          typeof constraints.audio === "object" ? { ...constraints.audio } : {};
+        audioConstraints.deviceId = { exact: selectedDevice.deviceId };
+        constraints = { ...constraints, audio: audioConstraints };
+      }
+
+      const stream = await originalGetUserMedia!(constraints);
+
+      // Aplicar processamento de áudio
       try {
         const processor = getAudioProcessor();
         return processor.process(stream);
@@ -37,7 +49,7 @@ function installAudioProcessingOverride() {
       }
     }
 
-    return stream;
+    return originalGetUserMedia!(constraints);
   };
 }
 
@@ -64,11 +76,9 @@ export function useVoiceAudioProcessing(voiceHook: VoiceRoomHook | null) {
 
     if (!connected && activeRef.current) {
       activeRef.current = false;
-      // Não remove o override aqui — pode ter DM call ativa também
     }
   }, [voiceHook?.status]);
 
-  // Cleanup total quando o componente desmonta
   useEffect(() => {
     return () => {
       activeRef.current = false;
@@ -92,7 +102,6 @@ export function useDmAudioProcessing(dmCallStatus: string) {
 
     if (!inCall && activeRef.current) {
       activeRef.current = false;
-      // Não remove override — pode ter voice room ativa
     }
   }, [dmCallStatus]);
 

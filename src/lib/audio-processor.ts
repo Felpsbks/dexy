@@ -5,6 +5,7 @@
  */
 
 let globalAudioProcessor: VoiceAudioProcessor | null = null;
+let selectedAudioDeviceId: string | null = null;
 
 export class VoiceAudioProcessor {
   private audioContext: AudioContext;
@@ -120,6 +121,13 @@ export function getAudioProcessor(): VoiceAudioProcessor {
     globalAudioProcessor = new VoiceAudioProcessor();
   }
   return globalAudioProcessor;
+}
+
+/**
+ * Define qual device de áudio usar
+ */
+export function setAudioDevice(deviceId: string | null) {
+  selectedAudioDeviceId = deviceId;
 }
 
 /**

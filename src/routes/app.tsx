@@ -67,6 +67,7 @@ import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { DmProfilePanel } from "@/components/DmProfilePanel";
 import { ProfileEditor } from "@/components/ProfileEditor";
 import { LinkAccountDialog } from "@/components/LinkAccountDialog";
+import { AudioDeviceSelector } from "@/components/AudioDeviceSelector";
 import { ReactionButton, ReactionList, ReactionPicker } from "@/components/MessageReactions";
 import { ProfilePopoverProvider, useProfilePopover } from "@/components/ProfilePopover";
 import {
@@ -1004,6 +1005,8 @@ function AppPage() {
                 </button>
               );
             })()}
+            <div className="w-px h-6 bg-border"></div>
+            <AudioDeviceSelector />
             <button
               onClick={() => setDeafened((v) => !v)}
               title={deafened ? "Reativar áudio" : "Ensurdecer"}
