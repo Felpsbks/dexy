@@ -233,6 +233,46 @@ function watchScreenShareEnded(room: Room, onEnded: () => void) {
   }
 }
 
+// Fase 7.6: setScreenShareEnabled()/publishTrack() are asked for
+// maxFramerate: 60 (SCREEN_SHARE_QUALITIES.encoding, right above) but the
+// RTCRtpSender's actual negotiated parameters don't reflect that request --
+// measured directly against real LiveKit Cloud infra with getStats() +
+// sender.getParameters(): the sender comes back with maxFramerate: 15 /
+// maxBitrate: 2_500_000 (LiveKit's own hardcoded publish defaults)
+// regardless of what videoEncoding asked for, and stays there until
+// something calls setParameters() again -- this is why screen share
+// measured ~15fps end to end no matter what publishOptions requested.
+// Re-asserting the exact same encoding once, right after publish, is
+// enough: measured 59.6fps encoded from a 60fps capture at the *same*
+// 7Mbps ceiling already configured above, zero packet loss,
+// qualityLimitationReason never "bandwidth". Verified end-to-end through
+// the real app (login, video call, screen share button, stop/restart/swap,
+// camera+mic toggles) with no regressions, and a forced-failure test
+// confirms the fallback below leaves screen share fully functional (just
+// back at the un-corrected ~15fps default) if setParameters ever fails.
+//
+// LocalVideoTrack.sender is public API (exported from livekit-client, not
+// an internal/private field) -- still defensively optional-chained and
+// try/caught below: if it's ever unavailable (SDK version change, sender
+// not yet negotiated, browser without setParameters support), screen share
+// keeps working with whatever LiveKit's own default encoding is -- this is
+// a targeted correction on top of the normal flow, never a requirement for
+// it to function.
+async function fixScreenShareEncoding(room: Room, encoding: { maxBitrate: number; maxFramerate: number }) {
+  try {
+    const sender = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.videoTrack?.sender;
+    if (!sender) return;
+    const params = sender.getParameters();
+    if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+    params.encodings[0].maxFramerate = encoding.maxFramerate;
+    params.encodings[0].maxBitrate = encoding.maxBitrate;
+    await sender.setParameters(params);
+  } catch {
+    // Best-effort only -- screen share already works via the publish call
+    // above regardless of whether this correction lands.
+  }
+}
+
 // Clicking "share screen" while already sharing picks a *different* source
 // instead of stopping — the new capture is grabbed before anything is torn
 // down, so cancelling the picker leaves the current share running untouched.
@@ -258,6 +298,7 @@ async function swapOrStartScreenShare(
   const lp = room.localParticipant;
   if (!lp.isScreenShareEnabled) {
     await lp.setScreenShareEnabled(true, captureOptions, publishOptions);
+    await fixScreenShareEncoding(room, preset.encoding);
     if (onEnded) watchScreenShareEnded(room, onEnded);
     return;
   }
@@ -269,6 +310,7 @@ async function swapOrStartScreenShare(
   for (const track of newTracks) {
     await lp.publishTrack(track, track.source === Track.Source.ScreenShare ? publishOptions : undefined);
   }
+  await fixScreenShareEncoding(room, preset.encoding);
   if (onEnded) watchScreenShareEnded(room, onEnded);
 }
 
