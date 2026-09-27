@@ -71,6 +71,9 @@ export default defineConfig(async ({ command, mode }) => {
   }
 
   return {
+    // Same value baked into the client and server bundles of one build --
+    // src/lib/app-version.ts compares them to detect a newer deploy.
+    define: { __BUILD_ID__: JSON.stringify(String(Date.now())) },
     server: { port: 8080 },
     resolve: { tsconfigPaths: true },
     plugins,
