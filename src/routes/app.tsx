@@ -71,9 +71,6 @@ import { AudioDeviceSelector } from "@/components/AudioDeviceSelector";
 import { ReactionButton, ReactionList, ReactionPicker } from "@/components/MessageReactions";
 import { ProfilePopoverProvider, useProfilePopover } from "@/components/ProfilePopover";
 import {
-  useGlobalAudioProcessing,
-} from "@/lib/voice-processing-hooks";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -312,7 +309,6 @@ function AppPage() {
   // Accepting a call while already in another one hangs up first; this
   // finishes the accept once the hook has re-bound to the ringing call.
   const [pendingAcceptCallId, setPendingAcceptCallId] = useState<string | null>(null);
-  useGlobalAudioProcessing();
   useCallSounds(dmCall.status);
   useReconnectingSound(dmCall.reconnecting);
   useScreenShareSound(dmCall.screenShareEnabled);
