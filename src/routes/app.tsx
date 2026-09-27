@@ -120,6 +120,8 @@ import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/auth";
 import { markGuestSignedOut } from "@/lib/guestDevice";
 import { buildVersionLabel } from "@/lib/app-version";
+import { declineDmCall, useIncomingDmCall } from "@/lib/incoming-call";
+import { IncomingCallCard } from "@/components/DmCall";
 import {
   useAddAttachment,
   useAssignRole,
@@ -300,12 +302,16 @@ function AppPage() {
   // The call itself lives here, above any single conversation view, so it
   // survives switching conversations or leaving DM mode entirely — it used
   // to live inside DmChatView and hang up the moment that view unmounted.
-  // While idle, it tracks whichever DM you're currently looking at (so the
-  // call/video buttons and incoming-call detection work there); once a call
-  // actually starts, it locks onto that conversation until the call ends,
-  // ignoring further navigation.
+  // While idle, it tracks the conversation of a call ringing for you (from any
+  // screen, via useIncomingDmCall) or else whichever DM you're looking at (so
+  // the call/video buttons work there); once a call actually starts, it locks
+  // onto that conversation until the call ends, ignoring further navigation.
+  const incomingCall = useIncomingDmCall(userId);
   const [callConversationId, setCallConversationId] = useState<string | undefined>(undefined);
   const dmCall = useDmCall(callConversationId, userId);
+  // Accepting a call while already in another one hangs up first; this
+  // finishes the accept once the hook has re-bound to the ringing call.
+  const [pendingAcceptCallId, setPendingAcceptCallId] = useState<string | null>(null);
   useGlobalAudioProcessing();
   useCallSounds(dmCall.status);
   useReconnectingSound(dmCall.reconnecting);
@@ -313,10 +319,64 @@ function AppPage() {
   useMuteToggleSound(dmCall.status !== "idle" && !dmCall.micEnabled);
   useMuteToggleSound(deafened);
   useEffect(() => {
-    if (dmCall.status === "idle") setCallConversationId(activeConversationId);
-  }, [activeConversationId, dmCall.status]);
+    if (dmCall.status === "idle") {
+      setCallConversationId(incomingCall?.conversation_id ?? activeConversationId);
+    }
+  }, [activeConversationId, dmCall.status, incomingCall?.conversation_id]);
+  const acceptDmCall = dmCall.accept;
+  useEffect(() => {
+    if (
+      pendingAcceptCallId &&
+      dmCall.status === "incoming" &&
+      dmCall.call?.id === pendingAcceptCallId
+    ) {
+      setPendingAcceptCallId(null);
+      void acceptDmCall();
+    }
+  }, [pendingAcceptCallId, dmCall.status, dmCall.call?.id, acceptDmCall]);
 
   const { data: dmConversations = [] } = useDmConversations(userId);
+
+  const incomingConversation = dmConversations.find((c) => c.id === incomingCall?.conversation_id);
+  const { data: fetchedIncomingCaller } = useProfile(
+    incomingConversation ? undefined : incomingCall?.started_by,
+  );
+  const incomingCaller =
+    incomingConversation && userId
+      ? incomingConversation.user_a === userId
+        ? incomingConversation.userB
+        : incomingConversation.userA
+      : fetchedIncomingCaller;
+  const showIncomingCard =
+    !!incomingCall &&
+    incomingCall.id !== pendingAcceptCallId &&
+    !(
+      dmCall.call?.id === incomingCall.id &&
+      (dmCall.status === "connecting" || dmCall.status === "active")
+    );
+
+  const acceptIncomingCall = async () => {
+    if (!incomingCall) return;
+    setActiveConversationId(incomingCall.conversation_id);
+    if (incomingCaller) setActiveDmProfile(incomingCaller);
+    setRailMode("dm");
+    setView("chat");
+    if (dmCall.status === "incoming" && dmCall.call?.id === incomingCall.id) {
+      await dmCall.accept();
+      return;
+    }
+    setPendingAcceptCallId(incomingCall.id);
+    if (dmCall.status !== "idle") await dmCall.hangup();
+  };
+
+  const declineIncomingCall = async () => {
+    if (!incomingCall) return;
+    if (dmCall.status === "incoming" && dmCall.call?.id === incomingCall.id) {
+      await dmCall.decline();
+    } else {
+      await declineDmCall(incomingCall.id);
+    }
+  };
 
   // Shared by every "Mensagem" action in the profile popover (message rows,
   // members panel, DM header) — same get-or-create-then-navigate flow
@@ -1373,6 +1433,17 @@ function AppPage() {
         open={rolesManagerOpen}
         onOpenChange={setRolesManagerOpen}
       />
+      <AnimatePresence>
+        {showIncomingCard && incomingCall && (
+          <IncomingCallCard
+            key={incomingCall.id}
+            callerProfile={incomingCaller}
+            kind={incomingCall.kind}
+            onAccept={() => void acceptIncomingCall()}
+            onDecline={() => void declineIncomingCall()}
+          />
+        )}
+      </AnimatePresence>
     </div>
     </ProfilePopoverProvider>
   );

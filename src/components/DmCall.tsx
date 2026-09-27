@@ -16,6 +16,7 @@ import {
   ScreenShareOff,
   Video,
   VideoOff,
+  X,
 } from "lucide-react";
 import {
   formatCallDuration,
@@ -372,51 +373,72 @@ function ControlButton({
   );
 }
 
-export function IncomingCallBanner({
+// Floating, app-wide incoming call card (Discord-style): rendered from
+// app.tsx so it shows no matter which screen you're on.
+export function IncomingCallCard({
   callerProfile,
   kind,
   onAccept,
   onDecline,
 }: {
-  callerProfile: Profile;
+  callerProfile: Profile | undefined;
   kind: string;
   onAccept: () => void;
   onDecline: () => void;
 }) {
+  const name = callerProfile?.name ?? "Alguém";
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: -12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      className="mx-3 sm:mx-6 mt-3 flex items-center gap-3 rounded-xl border border-primary/40 bg-card px-4 py-3"
-      style={{ boxShadow: "var(--shadow-glow)" }}
-    >
-      <img
-        src={avatarFor(callerProfile)}
-        alt=""
-        className="w-10 h-10 rounded-full object-cover shrink-0"
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold truncate">{callerProfile.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {kind === "video" ? "Chamada de vídeo recebida" : "Chamada de voz recebida"}
+    <div className="fixed inset-x-0 top-4 z-60 flex justify-center px-4 pointer-events-none sm:inset-x-auto sm:left-24 sm:top-16 sm:px-0">
+      <motion.div
+        role="alertdialog"
+        aria-label={`Chamada recebida de ${name}`}
+        initial={{ opacity: 0, scale: 0.92, y: -8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.92, y: -8 }}
+        transition={{ type: "spring", stiffness: 380, damping: 28 }}
+        className="pointer-events-auto w-60 rounded-2xl border border-border bg-card p-5 shadow-2xl flex flex-col items-center text-center"
+      >
+        <div className="relative w-20 h-20">
+          <motion.span
+            aria-hidden
+            className="absolute inset-0 rounded-full bg-[#23a55a]/50"
+            animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
+          />
+          {callerProfile ? (
+            <img
+              src={avatarFor(callerProfile)}
+              alt=""
+              className="relative w-20 h-20 rounded-full object-cover"
+            />
+          ) : (
+            <div className="relative w-20 h-20 rounded-full bg-secondary" />
+          )}
+        </div>
+        <p className="mt-4 max-w-full truncate text-base font-bold">{name}</p>
+        <p className="text-sm text-muted-foreground">
+          {kind === "video" ? "Chamada de vídeo recebida..." : "Chamada recebida..."}
         </p>
-      </div>
-      <button
-        onClick={onDecline}
-        className="w-9 h-9 rounded-full grid place-items-center bg-destructive text-destructive-foreground hover:brightness-110 transition"
-      >
-        <PhoneOff className="w-4 h-4" />
-      </button>
-      <button
-        onClick={onAccept}
-        className="w-9 h-9 rounded-full grid place-items-center text-primary-foreground hover:brightness-110 transition"
-        style={{ backgroundImage: "var(--gradient-dexy)" }}
-      >
-        <Phone className="w-4 h-4" />
-      </button>
-    </motion.div>
+        <div className="mt-5 grid w-full grid-cols-2 gap-3">
+          <button
+            onClick={onDecline}
+            title="Recusar"
+            aria-label="Recusar"
+            className="h-11 rounded-lg grid place-items-center bg-[#da373c] text-white transition hover:bg-[#a12d31]"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <button
+            onClick={onAccept}
+            title="Aceitar"
+            aria-label="Aceitar"
+            className="h-11 rounded-lg grid place-items-center bg-[#248046] text-white transition hover:bg-[#1a6334]"
+          >
+            {kind === "video" ? <Video className="w-5 h-5" /> : <Phone className="w-5 h-5" />}
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 

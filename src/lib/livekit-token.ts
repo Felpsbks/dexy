@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
-import { AccessToken } from "livekit-server-sdk";
+import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 
 export const mintVoiceToken = createServerFn({ method: "POST" })
   .validator((data: unknown) => data as { channelId: string; accessToken: string })
@@ -146,4 +146,75 @@ export const mintDmVoiceToken = createServerFn({ method: "POST" })
 
     const token = await at.toJwt();
     return { token, url: livekitUrl };
+  });
+
+// Grace before an unanswered/unattended call can be treated as abandoned:
+// covers the gap between the dm_calls write and the client actually joining
+// the LiveKit room (token mint + connect).
+const ORPHAN_GRACE_MS = 15_000;
+const RING_TIMEOUT_MS = 30_000;
+
+// A ringing/active dm_calls row whose LiveKit room is empty is a leftover
+// from an app that closed or crashed mid-call -- the caller joins the room as
+// soon as it starts ringing, so a live call always has someone in it. Ends it
+// so the unique ringing/active index stops blocking the next call.
+export const clearOrphanedDmCall = createServerFn({ method: "POST" })
+  .validator((data: unknown) => data as { conversationId: string; accessToken: string })
+  .handler(async ({ data }) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    const livekitUrl = process.env.VITE_LIVEKIT_URL;
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+
+    if (!supabaseUrl || !supabaseAnonKey || !livekitUrl || !apiKey || !apiSecret) {
+      throw new Error("Missing Supabase/LiveKit server configuration.");
+    }
+
+    // Caller's own JWT: RLS limits both the read and the update below to
+    // conversations they participate in.
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${data.accessToken}` } },
+    });
+    const { data: userData, error: userError } = await supabase.auth.getUser(data.accessToken);
+    if (userError || !userData.user) throw new Error("Not authenticated.");
+
+    const { data: row } = await supabase
+      .from("dm_calls")
+      .select("id, status, started_at, answered_at")
+      .eq("conversation_id", data.conversationId)
+      .in("status", ["ringing", "active"])
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!row) return { cleared: false };
+
+    const since = new Date(row.answered_at ?? row.started_at).getTime();
+    const age = Date.now() - since;
+    const ringExpired = row.status === "ringing" && age > RING_TIMEOUT_MS + ORPHAN_GRACE_MS;
+
+    if (!ringExpired) {
+      if (age < ORPHAN_GRACE_MS) return { cleared: false };
+      const rooms = new RoomServiceClient(livekitUrl.replace(/^wss:/, "https:"), apiKey, apiSecret);
+      let participantCount: number;
+      try {
+        participantCount = (await rooms.listParticipants(`dm-${data.conversationId}`)).length;
+      } catch (err) {
+        const e = err as { code?: string; message?: string };
+        if (e.code !== "not_found" && !/does not exist/i.test(e.message ?? "")) {
+          // Can't tell whether the call is live -- never end it on a guess.
+          return { cleared: false };
+        }
+        participantCount = 0;
+      }
+      if (participantCount > 0) return { cleared: false };
+    }
+
+    const terminal = row.status === "ringing" ? "missed" : "ended";
+    const { error: updateError } = await supabase
+      .from("dm_calls")
+      .update({ status: terminal, ended_at: new Date().toISOString() })
+      .eq("id", row.id)
+      .eq("status", row.status);
+    return { cleared: !updateError };
   });

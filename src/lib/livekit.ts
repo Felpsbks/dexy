@@ -32,7 +32,7 @@ const ROOM_PUBLISH_DEFAULTS = {
   videoCodec: "h264" as VideoCodec,
   audioPreset: AudioPresets.musicHighQualityStereo,
 };
-import { mintDmVoiceToken, mintVoiceToken } from "./livekit-token";
+import { clearOrphanedDmCall, mintDmVoiceToken, mintVoiceToken } from "./livekit-token";
 import { supabase } from "./supabase";
 import type { Database } from "./database.types";
 
@@ -630,7 +630,7 @@ export type DmCallKind = "audio" | "video";
 // How long an unanswered call keeps ringing before it's auto-marked "missed"
 // for both sides — without this, a call nobody answers (but nobody declines
 // either) would ring forever as long as both tabs stay open.
-const RING_TIMEOUT_MS = 30_000;
+export const RING_TIMEOUT_MS = 30_000;
 
 export function formatCallDuration(ms: number) {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
@@ -742,6 +742,19 @@ async function expireStaleCall(conversationId: string): Promise<void> {
       .update({ status: "ended", ended_at: new Date().toISOString() })
       .eq("id", data.id)
       .eq("status", "active");
+  }
+}
+
+// Age alone can't tell an abandoned call from a live one (an app that closed
+// 1 minute into a call left its row "active" and blocked calling again for
+// 5 minutes), so ask the server whether anyone is actually in the LiveKit room.
+async function clearOrphanedCall(conversationId: string): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    if (accessToken) await clearOrphanedDmCall({ data: { conversationId, accessToken } });
+  } catch {
+    // Best-effort: the INSERT that follows is still the authority.
   }
 }
 
@@ -1043,6 +1056,7 @@ export function useDmCall(
         // one moment that actually needs the slot free — means the fix
         // doesn't depend on anyone having the conversation open at all.
         await expireStaleCall(conversationId);
+        await clearOrphanedCall(conversationId);
 
         const { data, error: insertError } = await supabase
           .from("dm_calls")

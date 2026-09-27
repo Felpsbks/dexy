@@ -48,7 +48,6 @@ import {
   playMessageSentSound,
 } from "@/lib/callSounds";
 import {
-  IncomingCallBanner,
   OutgoingCallBanner,
   ActiveCallView,
   CallLogEntry,
@@ -653,14 +652,6 @@ export function DmChatView({
         )}
 
         <AnimatePresence>
-          {dmCall.status === "incoming" && dmCall.call && callHere && (
-            <IncomingCallBanner
-              callerProfile={otherProfile}
-              kind={dmCall.call.kind}
-              onAccept={dmCall.accept}
-              onDecline={dmCall.decline}
-            />
-          )}
           {dmCall.status === "outgoing" && callHere && <OutgoingCallBanner otherProfile={otherProfile} onCancel={dmCall.hangup} />}
           {(dmCall.status === "connecting" || dmCall.status === "active") && callHere && (
             <ActiveCallView
