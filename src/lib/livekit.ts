@@ -631,6 +631,9 @@ export type DmCallKind = "audio" | "video";
 // for both sides — without this, a call nobody answers (but nobody declines
 // either) would ring forever as long as both tabs stay open.
 export const RING_TIMEOUT_MS = 30_000;
+// Leaving a call (or dropping out of it) no longer ends it for the other
+// person; whoever is left alone gets this long for someone to come back.
+export const ALONE_TIMEOUT_MS = 2 * 60 * 1000;
 
 export function formatCallDuration(ms: number) {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
@@ -679,9 +682,16 @@ export interface DmCallHook {
   micEnabled: boolean;
   cameraEnabled: boolean;
   screenShareEnabled: boolean;
+  // An ongoing call in this conversation that I'm not connected to (I left,
+  // or my app closed/dropped) -- still joinable until it auto-ends.
+  joinableCall: DmCallRow | null;
+  // When I became the only one left in the call; it auto-ends
+  // ALONE_TIMEOUT_MS later unless someone (re)joins.
+  aloneSince: number | null;
   start: (kind: DmCallKind) => Promise<void>;
   accept: () => Promise<void>;
   decline: () => Promise<void>;
+  join: () => Promise<void>;
   hangup: () => Promise<void>;
   toggleMic: () => Promise<void>;
   toggleCamera: () => Promise<void>;
@@ -782,6 +792,8 @@ export function useDmCall(
   const [error, setError] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
+  const [joinableCall, setJoinableCall] = useState<DmCallRow | null>(null);
+  const [aloneSince, setAloneSince] = useState<number | null>(null);
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
 
   const setCallState = useCallback((row: DmCallRow | null) => {
@@ -902,15 +914,13 @@ export function useDmCall(
           }
         }
 
+        // Don't end the call for the other person: it stays joinable, and
+        // their alone-timer (or the orphan cleanup, if nobody is left) ends it.
         setReconnecting(false);
         setError(disconnectReasonLabel(reason));
-        await supabase
-          .from("dm_calls")
-          .update({ status: "ended", ended_at: new Date().toISOString() })
-          .eq("id", droppedCall.id)
-          .eq("status", "active");
         setCallState(null);
         setStatus("idle");
+        setJoinableCall(droppedCall);
         forceTick();
       })();
     },
@@ -931,6 +941,7 @@ export function useDmCall(
   useEffect(() => {
     if (!conversationId || !myId) return;
     let cancelled = false;
+    setJoinableCall(null);
 
     (async () => {
       await expireStaleCall(conversationId);
@@ -949,6 +960,20 @@ export function useDmCall(
       if (data.status === "ringing" && data.started_by !== myId) {
         setCallState(data);
         setStatus("incoming");
+        return;
+      }
+
+      if (data.status === "active" && !roomRef.current) {
+        // Only offer "join" if someone is actually still in it.
+        await clearOrphanedCall(conversationId);
+        if (cancelled) return;
+        const { data: stillActive } = await supabase
+          .from("dm_calls")
+          .select("*")
+          .eq("id", data.id)
+          .eq("status", "active")
+          .maybeSingle();
+        if (!cancelled && stillActive && !roomRef.current) setJoinableCall(stillActive);
       }
     })();
 
@@ -965,6 +990,10 @@ export function useDmCall(
         (payload) => {
           const row = (payload.new ?? payload.old) as DmCallRow | undefined;
           if (!row) return;
+
+          if (row.status === "ended" || row.status === "declined" || row.status === "missed") {
+            setJoinableCall((current) => (current?.id === row.id ? null : current));
+          }
 
           if (row.status === "ringing" && row.started_by !== myId) {
             setCallState(row);
@@ -1121,6 +1150,13 @@ export function useDmCall(
 
   const hangup = useCallback(async () => {
     const activeCall = callRef.current;
+    const othersStillIn = (roomRef.current?.remoteParticipants.size ?? 0) > 0;
+    if (activeCall?.answered_at && othersStillIn) {
+      // Leave, don't end: the other person keeps the call and I can rejoin.
+      endLocally();
+      setJoinableCall(activeCall);
+      return;
+    }
     if (activeCall) {
       const nextStatus = activeCall.answered_at ? "ended" : "missed";
       await supabase
@@ -1130,6 +1166,45 @@ export function useDmCall(
     }
     endLocally();
   }, [endLocally]);
+
+  const join = useCallback(async () => {
+    const target = joinableCall;
+    if (!target || !conversationId) return;
+    setError(null);
+    setMediaError(null);
+    setJoinableCall(null);
+    setCallState(target);
+    setStatus("connecting");
+    try {
+      await connectRoom(conversationId);
+      setStatus("active");
+    } catch (err) {
+      setError(
+        friendlyMediaError(err, "mic") ?? (err instanceof Error ? err.message : "Não foi possível entrar na chamada."),
+      );
+      endLocally();
+    }
+  }, [joinableCall, conversationId, connectRoom, setCallState, endLocally]);
+
+  // Alone in an active call (the other person left or dropped): end it if
+  // nobody comes back within ALONE_TIMEOUT_MS. Re-rendered on every
+  // participant connect/disconnect via forceTick.
+  const othersInRoom = roomRef.current?.remoteParticipants.size ?? 0;
+  useEffect(() => {
+    if (status !== "active" || reconnecting || othersInRoom > 0) {
+      setAloneSince(null);
+      return;
+    }
+    setAloneSince((since) => since ?? Date.now());
+  }, [status, reconnecting, othersInRoom]);
+  useEffect(() => {
+    if (aloneSince === null) return;
+    const timer = setTimeout(
+      () => void hangup(),
+      Math.max(0, aloneSince + ALONE_TIMEOUT_MS - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [aloneSince, hangup]);
 
   const toggleMic = useCallback(async () => {
     const room = roomRef.current;
@@ -1201,9 +1276,12 @@ export function useDmCall(
     micEnabled: room?.localParticipant.isMicrophoneEnabled ?? false,
     cameraEnabled: room?.localParticipant.isCameraEnabled ?? false,
     screenShareEnabled: room?.localParticipant.isScreenShareEnabled ?? false,
+    joinableCall,
+    aloneSince,
     start,
     accept,
     decline,
+    join,
     hangup,
     toggleMic,
     toggleCamera,

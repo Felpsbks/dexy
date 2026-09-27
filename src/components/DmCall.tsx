@@ -19,7 +19,9 @@ import {
   X,
 } from "lucide-react";
 import {
+  ALONE_TIMEOUT_MS,
   formatCallDuration,
+  formatCallTimer,
   type DmCallRow,
   type ParticipantInfo,
   type ScreenShareQuality,
@@ -396,7 +398,7 @@ export function IncomingCallCard({
 }) {
   const name = callerProfile?.name ?? "Alguém";
   return (
-    <div className="fixed inset-x-0 top-4 z-60 flex justify-center px-4 pointer-events-none sm:inset-x-auto sm:left-24 sm:top-16 sm:px-0">
+    <div className="fixed inset-0 z-60 flex items-center justify-center px-4 pointer-events-none">
       <motion.div
         role="alertdialog"
         aria-label={`Chamada recebida de ${name}`}
@@ -462,6 +464,57 @@ function RingingDots() {
         />
       ))}
     </span>
+  );
+}
+
+function AloneNotice({ otherName, aloneSince }: { otherName: string; aloneSince: number }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const remaining = Math.max(0, aloneSince + ALONE_TIMEOUT_MS - Date.now());
+  // Skip the brief "alone" gap right after a pickup, while the other side is
+  // still joining the room.
+  if (ALONE_TIMEOUT_MS - remaining < 3000) return null;
+  return (
+    <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-center gap-2 rounded-lg bg-background/90 backdrop-blur px-3 py-1.5 text-xs text-muted-foreground border border-border">
+      Aguardando {otherName} voltar · a chamada encerra em {formatCallTimer(remaining)}
+    </div>
+  );
+}
+
+// Shown to someone who left (or dropped out of) a call the other person is
+// still in -- rejoin instead of it having been hung up for both.
+export function JoinCallBanner({
+  otherProfile,
+  onJoin,
+}: {
+  otherProfile: Profile;
+  onJoin: () => void;
+}) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -12 }}
+      className="mx-3 sm:mx-6 mt-3 flex items-center gap-3 rounded-xl border border-primary/40 bg-card px-4 py-3"
+      style={{ boxShadow: "var(--shadow-glow)" }}
+    >
+      <img src={avatarFor(otherProfile)} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold truncate">Chamada em andamento</p>
+        <p className="text-xs text-muted-foreground truncate">{otherProfile.name} ainda está na chamada</p>
+      </div>
+      <button
+        onClick={onJoin}
+        className="h-9 px-4 rounded-lg flex items-center gap-2 bg-[#248046] text-white text-sm font-semibold transition hover:bg-[#1a6334]"
+      >
+        <Phone className="w-4 h-4" />
+        Entrar
+      </button>
+    </motion.div>
   );
 }
 
@@ -533,6 +586,7 @@ export function ActiveCallView({
   onHangup,
   deafened,
   fillAvailableHeight,
+  aloneSince,
 }: {
   myProfile: Profile;
   otherProfile: Profile;
@@ -553,6 +607,7 @@ export function ActiveCallView({
   // the browser, not guessed via vh) so the video shrinks to fit instead of
   // pushing controls off-screen or forcing a scrollbar.
   fillAvailableHeight?: boolean;
+  aloneSince?: number | null;
 }) {
   const [screenShareQuality, setScreenShareQuality] = useState<ScreenShareQuality>("1080p");
   const profileFor = (identity: string) => (identity === myProfile.id ? myProfile : otherProfile);
@@ -575,6 +630,9 @@ export function ActiveCallView({
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
           Reconectando...
         </div>
+      )}
+      {!reconnecting && !connecting && aloneSince != null && (
+        <AloneNotice otherName={otherProfile.name} aloneSince={aloneSince} />
       )}
       <AnimatePresence mode="wait">
         {connecting ? (

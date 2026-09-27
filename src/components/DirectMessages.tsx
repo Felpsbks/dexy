@@ -48,6 +48,7 @@ import {
   playMessageSentSound,
 } from "@/lib/callSounds";
 import {
+  JoinCallBanner,
   OutgoingCallBanner,
   ActiveCallView,
   CallLogEntry,
@@ -581,6 +582,8 @@ export function DmChatView({
   }, [conversationId, timeline]);
 
   const inCall = callHere && (dmCall.status === "active" || dmCall.status === "connecting");
+  const joinableHere =
+    dmCall.status === "idle" && dmCall.joinableCall?.conversation_id === conversationId;
   const callElapsedMs = useCallElapsedMs(callHere ? dmCall.call?.answered_at : null);
   const screenShareActive = callHere && dmCall.participants.some((p) => p.screenShareTrack);
 
@@ -609,6 +612,8 @@ export function DmChatView({
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                   {dmCall.status === "connecting" ? "Conectando…" : `Em chamada • ${formatCallTimer(callElapsedMs)}`}
                 </div>
+              ) : joinableHere ? (
+                <div className="text-xs text-primary leading-tight">Chamada em andamento</div>
               ) : (
                 <div className="text-xs text-muted-foreground leading-tight">
                   {statusLabel[otherDisplayStatus]}
@@ -618,18 +623,18 @@ export function DmChatView({
           </button>
           <div className="ml-auto flex items-center gap-1 text-muted-foreground">
             <button
-              onClick={() => dmCall.start("audio")}
+              onClick={() => (joinableHere ? dmCall.join() : dmCall.start("audio"))}
               disabled={dmCall.status !== "idle" || isBlocked}
               className="p-2 rounded hover:bg-secondary transition disabled:opacity-30"
-              title={isBlocked ? "Bloqueado" : "Chamada de voz"}
+              title={isBlocked ? "Bloqueado" : joinableHere ? "Entrar na chamada" : "Chamada de voz"}
             >
               <Phone className="w-4 h-4" />
             </button>
             <button
-              onClick={() => dmCall.start("video")}
+              onClick={() => (joinableHere ? dmCall.join() : dmCall.start("video"))}
               disabled={dmCall.status !== "idle" || isBlocked}
               className="p-2 rounded hover:bg-secondary transition disabled:opacity-30"
-              title={isBlocked ? "Bloqueado" : "Chamada de vídeo"}
+              title={isBlocked ? "Bloqueado" : joinableHere ? "Entrar na chamada" : "Chamada de vídeo"}
             >
               <Video className="w-4 h-4" />
             </button>
@@ -653,6 +658,7 @@ export function DmChatView({
 
         <AnimatePresence>
           {dmCall.status === "outgoing" && callHere && <OutgoingCallBanner otherProfile={otherProfile} onCancel={dmCall.hangup} />}
+          {joinableHere && <JoinCallBanner otherProfile={otherProfile} onJoin={dmCall.join} />}
           {(dmCall.status === "connecting" || dmCall.status === "active") && callHere && (
             <ActiveCallView
               myProfile={myProfile}
@@ -670,6 +676,7 @@ export function DmChatView({
               onHangup={dmCall.hangup}
               deafened={deafened}
               fillAvailableHeight={screenShareActive}
+              aloneSince={dmCall.aloneSince}
             />
           )}
         </AnimatePresence>
