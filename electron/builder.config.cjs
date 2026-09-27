@@ -6,7 +6,8 @@ module.exports = {
   directories: { output: "release" },
   win: {
     target: ["nsis"],
-    icon: "public/favicon.ico",
+    icon: "public/icon-512.png",
+    signAndEditExecutable: false,
   },
   nsis: {
     oneClick: false,

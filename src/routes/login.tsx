@@ -49,11 +49,6 @@ function normalizePhone(raw: string): string {
   return raw.replace(/[^\d+]/g, "");
 }
 
-function isValidPhone(raw: string): boolean {
-  const digits = raw.replace(/\D/g, "");
-  return digits.length >= 10 && digits.length <= 15;
-}
-
 function LoginPage() {
   const router = useRouter();
   const session = useSession();
@@ -135,10 +130,7 @@ function LoginPage() {
           setPostSignInCheck(false);
         }
       } else if (mode === "signup") {
-        if (!isValidPhone(phone)) {
-          setError("Informe um telefone válido, com DDD.");
-          return;
-        }
+        // Phone requirement temporarily disabled for easier friend/test signups.
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -628,11 +620,10 @@ function LoginPage() {
                     </div>
                     <input
                       type="tel"
-                      required
                       autoComplete="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="Telefone, com DDD"
+                      placeholder="Telefone, com DDD (opcional por enquanto)"
                       className="w-full bg-[#131924] border border-gray-800 focus:border-[#00e5ff] rounded-xl py-3.5 pl-11 pr-4 text-sm text-white placeholder-gray-500 outline-none transition-colors"
                     />
                   </div>
