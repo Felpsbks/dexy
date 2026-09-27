@@ -23,6 +23,10 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Electron
+dist-electron/
+release/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
