@@ -283,8 +283,16 @@ function ScreenShareStage({
         className="group relative flex-1 min-h-0 rounded-2xl p-3 overflow-hidden"
         style={{ backgroundColor: "#050A10" }}
       >
-        <div className="w-full h-full overflow-hidden">
-          <TrackVideo track={sharer.screenShareTrack} muted={sharer.isLocal} contain />
+        <div className="relative w-full h-full overflow-hidden rounded-xl">
+          {/* Fills the letterbox bars (e.g. a 4:3 game in the wider stage)
+              with a blurred, zoomed copy of the same stream -- the sharp
+              video on top stays uncropped, so no HUD is lost. */}
+          <div aria-hidden className="absolute inset-0 scale-125 opacity-60 blur-3xl saturate-150">
+            <TrackVideo track={sharer.screenShareTrack} muted />
+          </div>
+          <div className="relative w-full h-full">
+            <TrackVideo track={sharer.screenShareTrack} muted={sharer.isLocal} contain />
+          </div>
         </div>
         {/* Tab/system audio, when the sharer's browser includes it — a
             separate published source from both the video and their
