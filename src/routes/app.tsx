@@ -119,6 +119,7 @@ import { useIsUserOnline, useOnlineUserIds, usePresenceConnection } from "@/lib/
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/auth";
 import { markGuestSignedOut } from "@/lib/guestDevice";
+import { buildVersionLabel } from "@/lib/app-version";
 import {
   useAddAttachment,
   useAssignRole,
@@ -3859,6 +3860,9 @@ function SettingsView({
             {t}
           </button>
         ))}
+        <div className="pt-6 px-3 text-[11px] text-muted-foreground">
+          Versão {buildVersionLabel()}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-8 max-w-2xl">
         <h2 className="text-2xl font-bold">{tab}</h2>

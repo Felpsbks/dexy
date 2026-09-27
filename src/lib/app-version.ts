@@ -6,6 +6,16 @@ const getDeployedBuildId = createServerFn({ method: "GET" }).handler(() => __BUI
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
+export function buildVersionLabel() {
+  return new Date(Number(__BUILD_ID__)).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 // The desktop app loads dexy.site live, so a reload is all it takes to pick
 // up a new deploy -- this just tells the user one exists.
 export function useUpdateNotice() {
