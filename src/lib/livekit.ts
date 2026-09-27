@@ -104,27 +104,43 @@ const MIC_CAPTURE_BASE_OPTIONS: AudioCaptureOptions = {
 };
 
 // Builds the actual per-connect/per-toggle mic options: base constraints
-// above, plus Krisp's ML noise-suppression model (same tier Discord itself
-// partly relies on) layered on top of the browser's own suppression, plus
-// Chromium's experimental voiceIsolation constraint as a second line of
-// defense, plus whichever input device the user picked in
-// AudioDeviceSelector. Built fresh on every call (not module-level) so a
-// device switch or Krisp-support check made after the module first loaded is
-// always picked up. Falls back gracefully — Krisp/voiceIsolation are simply
-// omitted/ignored when unsupported, device selection falls back to
-// getSelectedAudioDevice()'s own auto-detect, so the mic always still works.
+// above, plus Chromium's experimental voiceIsolation constraint, plus
+// whichever input device the user picked in AudioDeviceSelector. Built fresh
+// on every call (not module-level) so a device switch is always picked up;
+// device selection falls back to getSelectedAudioDevice()'s own auto-detect.
 async function buildMicCaptureOptions(): Promise<AudioCaptureOptions> {
   const selected = await getSelectedAudioDevice().catch(() => null);
-  // Kept out of the server bundle entirely: Krisp touches browser-only globals
-  // (Worker) at import time, and Nitro can merge it into a chunk that loads at
-  // Worker startup -- that crashed SSR with a 500 on every page.
-  const krisp = import.meta.env.SSR ? null : await import("@livekit/krisp-noise-filter");
   return {
     ...MIC_CAPTURE_BASE_OPTIONS,
     voiceIsolation: true,
     ...(selected ? { deviceId: selected.deviceId } : {}),
-    ...(krisp?.isKrispNoiseFilterSupported() ? { processor: krisp.KrispNoiseFilter({ quality: "medium" }) } : {}),
   };
+}
+
+// Krisp noise suppression, applied to the already-published mic track rather
+// than passed as `processor` in the capture options: livekit-client 2.21
+// calls setProcessor() inside createLocalTracks before it sets the track's
+// AudioContext, which throws "Audio context needs to be set on
+// LocalAudioTrack" and aborted the whole call connect. Best-effort -- the mic
+// keeps working without Krisp if anything here fails.
+async function applyKrispNoiseFilter(room: Room) {
+  // Kept out of the server bundle: Krisp touches Worker at import time, which
+  // crashed SSR on Cloudflare Workers with a 500 on every page.
+  if (import.meta.env.SSR) return;
+  const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
+  if (!track || track.getProcessor()) return;
+  try {
+    const krisp = await import("@livekit/krisp-noise-filter");
+    if (!krisp.isKrispNoiseFilterSupported()) return;
+    await track.setProcessor(krisp.KrispNoiseFilter({ quality: "medium" }));
+  } catch (err) {
+    console.warn("Krisp noise filter unavailable, continuing without it", err);
+  }
+}
+
+async function enableMic(room: Room, enabled: boolean) {
+  await room.localParticipant.setMicrophoneEnabled(enabled, await buildMicCaptureOptions());
+  if (enabled) void applyKrispNoiseFilter(room);
 }
 
 // getUserMedia/getDisplayMedia reject with a DOMException whose .name is one
@@ -445,7 +461,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
         });
 
       await room.connect(url, token);
-      await room.localParticipant.setMicrophoneEnabled(micPrefRef.current, await buildMicCaptureOptions());
+      await enableMic(room, micPrefRef.current);
 
       roomRef.current = room;
       forceTick();
@@ -528,7 +544,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     if (!room) return;
     const enabled = room.localParticipant.isMicrophoneEnabled;
     try {
-      await room.localParticipant.setMicrophoneEnabled(!enabled, await buildMicCaptureOptions());
+      await enableMic(room, !enabled);
       // Only remember the new preference (and clear any earlier error) once
       // the SDK call actually succeeded -- previously this ran unconditionally
       // before the await even settled, so a rejected toggle (permission
@@ -803,7 +819,7 @@ export function useDmCall(
         });
 
       await room.connect(url, token);
-      await room.localParticipant.setMicrophoneEnabled(micPrefRef.current, await buildMicCaptureOptions());
+      await enableMic(room, micPrefRef.current);
       if (callRef.current?.kind === "video") {
         // A camera failure (busy, missing, denied) shouldn't kill an otherwise
         // working audio call — fall back to audio-only instead of aborting.
@@ -1106,7 +1122,7 @@ export function useDmCall(
     if (!room) return;
     const enabled = !room.localParticipant.isMicrophoneEnabled;
     try {
-      await room.localParticipant.setMicrophoneEnabled(enabled, await buildMicCaptureOptions());
+      await enableMic(room, enabled);
       // Same ordering fix as useVoiceRoom.toggleMic: only commit the new
       // preference after the SDK call actually succeeds.
       micPrefRef.current = enabled;
