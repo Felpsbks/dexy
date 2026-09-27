@@ -15,7 +15,6 @@ import {
   type TrackPublishOptions,
   type VideoCaptureOptions,
 } from "livekit-client";
-import { isKrispNoiseFilterSupported, KrispNoiseFilter } from "@livekit/krisp-noise-filter";
 import { getSelectedAudioDevice } from "./audio-devices";
 
 // Discord uses ~128kbps Opus for voice channels. LiveKit's
@@ -116,11 +115,15 @@ const MIC_CAPTURE_BASE_OPTIONS: AudioCaptureOptions = {
 // getSelectedAudioDevice()'s own auto-detect, so the mic always still works.
 async function buildMicCaptureOptions(): Promise<AudioCaptureOptions> {
   const selected = await getSelectedAudioDevice().catch(() => null);
+  // Kept out of the server bundle entirely: Krisp touches browser-only globals
+  // (Worker) at import time, and Nitro can merge it into a chunk that loads at
+  // Worker startup -- that crashed SSR with a 500 on every page.
+  const krisp = import.meta.env.SSR ? null : await import("@livekit/krisp-noise-filter");
   return {
     ...MIC_CAPTURE_BASE_OPTIONS,
     voiceIsolation: true,
     ...(selected ? { deviceId: selected.deviceId } : {}),
-    ...(isKrispNoiseFilterSupported() ? { processor: KrispNoiseFilter({ quality: "medium" }) } : {}),
+    ...(krisp?.isKrispNoiseFilterSupported() ? { processor: krisp.KrispNoiseFilter({ quality: "medium" }) } : {}),
   };
 }
 
