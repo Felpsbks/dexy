@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Ban,
+  Reply,
   Check,
   CheckCheck,
   Download,
@@ -47,6 +48,7 @@ import {
   useIncomingMessageSound,
   playMessageSentSound,
 } from "@/lib/callSounds";
+import { typingLabel, useTypingIndicator } from "@/lib/typing";
 import {
   JoinCallBanner,
   OutgoingCallBanner,
@@ -426,6 +428,20 @@ export function DmChatView({
   const callBusyElsewhere = dmCall.status !== "idle" && dmCall.call?.conversation_id !== conversationId;
   useIncomingMessageSound(messages[messages.length - 1], conversationId, myId);
   const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState<DmMessageWithAuthor | null>(null);
+  const { typingNames, notifyTyping, notifyStopped } = useTypingIndicator(
+    conversationId ? `dm:${conversationId}` : undefined,
+    myId,
+    myProfile.name,
+  );
+  const messageById = new Map(messages.map((m) => [m.id, m]));
+  const jumpToMessage = (id: string) => {
+    const el = document.getElementById(`dm-msg-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("dexy-msg-flash");
+    setTimeout(() => el.classList.remove("dexy-msg-flash"), 1600);
+  };
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -457,7 +473,9 @@ export function DmChatView({
     if ((!text && !pendingFile) || isBlocked) return;
     setAttachError(null);
     try {
-      const message = await sendMessage.mutateAsync(text);
+      const message = await sendMessage.mutateAsync({ content: text, replyToId: replyTo?.id ?? null });
+      setReplyTo(null);
+      notifyStopped();
       if (pendingFile && message) {
         const uploaded = await uploadAttachment.mutateAsync({ conversationId, file: pendingFile });
         await addAttachment.mutateAsync({ dmMessageId: message.id, ...uploaded });
@@ -527,6 +545,12 @@ export function DmChatView({
             onReact={(emoji) => handleReact(item.message.id, emoji)}
             onEdit={(content) => editMessage.mutate({ id: item.message.id, content })}
             onDelete={() => deleteMessage.mutate(item.message.id)}
+            onReply={() => {
+              setReplyTo(item.message);
+              document.querySelector<HTMLTextAreaElement>("#dm-composer")?.focus();
+            }}
+            replyTarget={item.message.reply_to_id ? messageById.get(item.message.reply_to_id) ?? null : undefined}
+            onJumpTo={jumpToMessage}
           />,
         );
         prevMessageAuthor = item.message.author_id;
@@ -752,6 +776,21 @@ export function DmChatView({
             </div>
           )}
           {attachError && <p className="mb-2 text-xs text-destructive">{attachError}</p>}
+          {replyTo && (
+            <div className="mb-1.5 flex items-center gap-2 rounded-lg bg-secondary/60 px-3 py-1.5 text-xs text-muted-foreground">
+              <Reply className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">
+                Respondendo a <span className="font-semibold text-foreground">{replyTo.author.name}</span>
+              </span>
+              <button
+                onClick={() => setReplyTo(null)}
+                aria-label="Cancelar resposta"
+                className="ml-auto p-0.5 rounded hover:bg-background shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           <div className="flex items-end gap-2 bg-secondary rounded-2xl border border-border focus-within:border-primary transition duration-200 px-4 py-2.5 has-disabled:opacity-50">
             <input
               id="dm-composer-file-input"
@@ -771,11 +810,20 @@ export function DmChatView({
               <Paperclip className="w-4 h-4" />
             </label>
             <textarea
+              id="dm-composer"
               rows={1}
               value={draft}
               disabled={isBlocked}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                if (e.target.value) notifyTyping();
+                else notifyStopped();
+              }}
               onKeyDown={(e) => {
+                if (e.key === "Escape" && replyTo) {
+                  setReplyTo(null);
+                  return;
+                }
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   send();
@@ -792,6 +840,14 @@ export function DmChatView({
             >
               <Send className="w-4 h-4" />
             </button>
+          </div>
+          <div className="h-5 px-1 pt-0.5 text-xs text-muted-foreground truncate" aria-live="polite">
+            {typingLabel(typingNames) && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="dexy-typing-dots"><i /><i /><i /></span>
+                <span><span className="font-semibold text-foreground">{typingLabel(typingNames)}</span></span>
+              </span>
+            )}
           </div>
         </div>
         )}
@@ -828,6 +884,9 @@ function DmMessageRow({
   onReact,
   onEdit,
   onDelete,
+  onReply,
+  replyTarget,
+  onJumpTo,
 }: {
   message: DmMessageWithAuthor;
   compact: boolean;
@@ -837,6 +896,9 @@ function DmMessageRow({
   onReact: (emoji: string) => void;
   onEdit: (content: string) => void;
   onDelete: () => void;
+  onReply: () => void;
+  replyTarget?: DmMessageWithAuthor | null;
+  onJumpTo: (id: string) => void;
 }) {
   const [hover, setHover] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -848,9 +910,10 @@ function DmMessageRow({
 
   return (
     <div
+      id={`dm-msg-${message.id}`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className={`group relative flex gap-3 px-3 py-1 rounded-lg hover:bg-secondary/40 ${compact ? "mt-0.5" : "mt-3"} ${
+      className={`group relative flex gap-3 px-3 py-1 rounded-lg hover:bg-secondary/40 ${compact && !message.reply_to_id ? "mt-0.5" : "mt-3"} ${
         isMine ? "flex-row-reverse" : ""
       }`}
     >
@@ -866,6 +929,23 @@ function DmMessageRow({
         </button>
       )}
       <div className={`min-w-0 flex-1 flex flex-col ${isMine ? "items-end" : "items-start"}`}>
+        {replyTarget !== undefined && (
+          <button
+            onClick={() => replyTarget && onJumpTo(replyTarget.id)}
+            className="mb-0.5 flex max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition"
+          >
+            <Reply className="w-3 h-3 shrink-0 -scale-x-100" />
+            {replyTarget ? (
+              <>
+                <img src={avatarFor(replyTarget.author)} alt="" className="w-4 h-4 rounded-full object-cover" />
+                <span className="font-semibold shrink-0">{replyTarget.author.name}</span>
+                <span className="truncate">{replyTarget.content || "Anexo"}</span>
+              </>
+            ) : (
+              <span className="italic">Mensagem original não carregada ou apagada</span>
+            )}
+          </button>
+        )}
         {editing ? (
           <div className="mt-1 w-full">
             <input
@@ -935,6 +1015,14 @@ function DmMessageRow({
           <ReactionPicker onSelect={onReact} align={isMine ? "start" : "end"}>
             <ReactionButton />
           </ReactionPicker>
+          <button
+            onClick={onReply}
+            title="Responder"
+            aria-label="Responder"
+            className="p-2 hover:bg-secondary text-muted-foreground hover:text-foreground transition"
+          >
+            <Reply className="w-4 h-4" />
+          </button>
           {isMine && (
             <>
               <button

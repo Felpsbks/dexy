@@ -121,6 +121,8 @@ import { markGuestSignedOut } from "@/lib/guestDevice";
 import { buildVersionLabel } from "@/lib/app-version";
 import { declineDmCall, useIncomingDmCall } from "@/lib/incoming-call";
 import { getDesktop, notifyNative } from "@/lib/desktop";
+import { getChannelReply, mentionsHandle, renderWithMentions, setChannelReply, useChannelReply } from "@/lib/channel-reply";
+import { typingLabel, useTypingIndicator } from "@/lib/typing";
 import { IncomingCallCard } from "@/components/DmCall";
 import {
   useAddAttachment,
@@ -722,7 +724,8 @@ function AppPage() {
     if (!text && !pendingFile) return;
     setAttachError(null);
     try {
-      const message = await sendMessage.mutateAsync(text);
+      const message = await sendMessage.mutateAsync({ content: text, replyToId: getChannelReply()?.id ?? null });
+      setChannelReply(null);
       if (pendingFile && message) {
         const uploaded = await uploadAttachment.mutateAsync({
           channelId: channel.id,
@@ -763,6 +766,20 @@ function AppPage() {
       }
       setRailMode("dm");
       setView("chat");
+    } else if (n.type === "mention" && n.related_id) {
+      const channelId = n.related_id;
+      void supabase
+        .from("channels")
+        .select("server_id")
+        .eq("id", channelId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data) return;
+          setActiveServer(data.server_id);
+          setActiveChannel(channelId);
+          setRailMode("servers");
+          setView("chat");
+        });
     } else if (n.type === "friend_request" || n.type === "friend_request_accepted") {
       // "friend_request_accepted" isn't emitted yet -- that trigger is a
       // proposed, not-yet-applied migration (see Fase 2 report). Handled
@@ -1316,12 +1333,16 @@ function AppPage() {
                       loadingOlderMessages={loadingOlderMessages}
                       loadOlderMessages={loadOlderMessages}
                       myId={userId}
+                      myHandle={profile.handle}
                       canModerateMessages={canModerateMessages}
                       onReact={handleReact}
                       onEdit={(mid, content) => editMessage.mutate({ id: mid, content })}
                       onDelete={(mid) => deleteMessage.mutate(mid)}
                     />
                     <Composer
+                      channelId={channel.id}
+                      myId={userId}
+                      myName={profile.name}
                       channelName={channel.name}
                       value={draft}
                       onChange={setDraft}
@@ -3356,6 +3377,7 @@ function ChatArea({
   loadingOlderMessages,
   loadOlderMessages,
   myId,
+  myHandle,
   canModerateMessages,
   onReact,
   onEdit,
@@ -3369,6 +3391,7 @@ function ChatArea({
   loadingOlderMessages: boolean;
   loadOlderMessages: () => void;
   myId: string | undefined;
+  myHandle?: string;
   canModerateMessages: boolean;
   onReact: (mid: string, emoji: string) => void;
   onEdit: (mid: string, content: string) => void;
@@ -3438,7 +3461,7 @@ function ChatArea({
       )}
       {messages.map((m, i) => {
         const prev = messages[i - 1];
-        const compact = !!prev && prev.author_id === m.author_id;
+        const compact = !!prev && prev.author_id === m.author_id && !m.reply_to_id;
         return (
           <MessageRow
             key={m.id}
@@ -3447,6 +3470,8 @@ function ChatArea({
             compact={compact}
             isMine={m.author_id === myId}
             myId={myId}
+            myHandle={myHandle}
+            replyTarget={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) ?? null : undefined}
             canModerateMessages={canModerateMessages}
             onReact={(e) => onReact(m.id, e)}
             onEdit={(c) => onEdit(m.id, c)}
@@ -3464,6 +3489,8 @@ function MessageRow({
   compact,
   isMine,
   myId,
+  myHandle,
+  replyTarget,
   canModerateMessages,
   onReact,
   onEdit,
@@ -3474,6 +3501,8 @@ function MessageRow({
   compact: boolean;
   isMine: boolean;
   myId: string | undefined;
+  myHandle?: string;
+  replyTarget?: MessageWithAuthor | null;
   canModerateMessages: boolean;
   onReact: (emoji: string) => void;
   onEdit: (content: string) => void;
@@ -3490,9 +3519,14 @@ function MessageRow({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
+      id={`ch-msg-${message.id}`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className={`group relative flex gap-3 px-3 py-1 rounded-lg hover:bg-secondary/40 ${compact ? "mt-0.5" : "mt-3"}`}
+      className={`group relative flex gap-3 px-3 py-1 rounded-lg ${
+        mentionsHandle(message.content, myHandle) && !isMine
+          ? "bg-amber-400/10 border-l-2 border-amber-400 hover:bg-amber-400/15"
+          : "hover:bg-secondary/40"
+      } ${compact ? "mt-0.5" : "mt-3"}`}
     >
       {compact ? (
         <div className="w-10 shrink-0 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 text-right pr-1 pt-1">
@@ -3504,6 +3538,29 @@ function MessageRow({
         </button>
       )}
       <div className="min-w-0 flex-1">
+        {replyTarget !== undefined && (
+          <button
+            onClick={() => {
+              const el = replyTarget && document.getElementById(`ch-msg-${replyTarget.id}`);
+              if (!el) return;
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              el.classList.add("dexy-msg-flash");
+              setTimeout(() => el.classList.remove("dexy-msg-flash"), 1600);
+            }}
+            className="mb-0.5 flex max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition"
+          >
+            <Reply className="w-3 h-3 shrink-0 -scale-x-100" />
+            {replyTarget ? (
+              <>
+                <img src={avatarFor(replyTarget.author)} alt="" className="w-4 h-4 rounded-full object-cover" />
+                <span className="font-semibold shrink-0">{replyTarget.author.name}</span>
+                <span className="truncate">{replyTarget.content || "Anexo"}</span>
+              </>
+            ) : (
+              <span className="italic">Mensagem original não carregada ou apagada</span>
+            )}
+          </button>
+        )}
         {!compact && (
           <div className="flex items-baseline gap-2">
             <button
@@ -3540,7 +3597,7 @@ function MessageRow({
           </div>
         ) : (
           <div className="text-[15px] leading-relaxed break-words">
-            {message.content}
+            {renderWithMentions(message.content, myHandle)}
             {message.edited_at && (
               <span className="text-[10px] text-muted-foreground ml-1">(editado)</span>
             )}
@@ -3567,7 +3624,13 @@ function MessageRow({
             <ReactionPicker onSelect={onReact} align="end">
               <ReactionButton />
             </ReactionPicker>
-            <ActionBtn icon={Reply} />
+            <ActionBtn
+              icon={Reply}
+              onClick={() => {
+                setChannelReply({ id: message.id, authorName: author.name });
+                document.querySelector<HTMLTextAreaElement>("#channel-composer")?.focus();
+              }}
+            />
             {/* Editing stays author-only — moderate_messages was only ever
                 scoped to deletion (Etapa 5.2), RLS still only lets the
                 author UPDATE a message's content. Deletion is the one
@@ -3642,6 +3705,9 @@ function ActionBtn({
 }
 
 function Composer({
+  channelId,
+  myId,
+  myName,
   channelName,
   value,
   onChange,
@@ -3652,6 +3718,9 @@ function Composer({
   onRemoveFile,
   error,
 }: {
+  channelId: string;
+  myId: string | undefined;
+  myName: string | undefined;
   channelName: string;
   value: string;
   onChange: (v: string) => void;
@@ -3663,8 +3732,26 @@ function Composer({
   error: string | null;
 }) {
   const fileInputId = "composer-file-input";
+  const replyTo = useChannelReply();
+  const { typingNames, notifyTyping, notifyStopped } = useTypingIndicator(`channel:${channelId}`, myId, myName);
+  const typing = typingLabel(typingNames);
   return (
-    <div className="px-2 sm:px-6 pb-4 pt-1">
+    <div className="px-2 sm:px-6 pb-1 pt-1">
+      {replyTo && (
+        <div className="mb-1.5 flex items-center gap-2 rounded-lg bg-secondary/60 px-3 py-1.5 text-xs text-muted-foreground">
+          <Reply className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">
+            Respondendo a <span className="font-semibold text-foreground">{replyTo.authorName}</span>
+          </span>
+          <button
+            onClick={() => setChannelReply(null)}
+            aria-label="Cancelar resposta"
+            className="ml-auto p-0.5 rounded hover:bg-background shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       {pendingFile && (
         <div className="mb-2 flex items-center gap-2 bg-secondary border border-border rounded-lg px-3 py-2 w-fit max-w-full">
           <FileText className="w-4 h-4 text-primary shrink-0" />
@@ -3699,12 +3786,22 @@ function Composer({
           <Paperclip className="w-4 h-4" />
         </label>
         <textarea
+          id="channel-composer"
           rows={1}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            if (e.target.value) notifyTyping();
+            else notifyStopped();
+          }}
           onKeyDown={(e) => {
+            if (e.key === "Escape" && replyTo) {
+              setChannelReply(null);
+              return;
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
+              notifyStopped();
               onSend();
             }
           }}
@@ -3725,6 +3822,14 @@ function Composer({
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
+      </div>
+      <div className="h-5 px-1 pt-0.5 text-xs text-muted-foreground truncate" aria-live="polite">
+        {typing && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="dexy-typing-dots"><i /><i /><i /></span>
+            <span className="font-semibold text-foreground">{typing}</span>
+          </span>
+        )}
       </div>
     </div>
   );

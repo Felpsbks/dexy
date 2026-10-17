@@ -1274,12 +1274,15 @@ export function useMessages(channelId: string | undefined) {
 // Sends don't invalidate/refetch — the INSERT lands back through this same
 // client's own realtime subscription (see useMessages above) and gets
 // patched into the cache from there, so there's no separate round trip.
+export type SendInput = string | { content: string; replyToId?: string | null };
+
 export function useSendMessage(channelId: string | undefined, authorId: string | undefined) {
   return useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async (input: SendInput) => {
+      const { content, replyToId } = typeof input === "string" ? { content: input, replyToId: null } : input;
       const { data, error } = await supabase
         .from("messages")
-        .insert({ channel_id: channelId!, author_id: authorId!, content })
+        .insert({ channel_id: channelId!, author_id: authorId!, content, reply_to_id: replyToId ?? null })
         .select()
         .single();
       if (error) throw error;
@@ -1894,10 +1897,11 @@ export function useDmMessages(conversationId: string | undefined) {
 
 export function useSendDmMessage(conversationId: string | undefined, authorId: string | undefined) {
   return useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async (input: SendInput) => {
+      const { content, replyToId } = typeof input === "string" ? { content: input, replyToId: null } : input;
       const { data, error } = await supabase
         .from("dm_messages")
-        .insert({ conversation_id: conversationId!, author_id: authorId!, content })
+        .insert({ conversation_id: conversationId!, author_id: authorId!, content, reply_to_id: replyToId ?? null })
         .select()
         .single();
       if (error) throw error;

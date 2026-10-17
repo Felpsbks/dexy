@@ -243,6 +243,7 @@ export type Database = {
           created_at: string;
           edited_at: string | null;
           id: string;
+          reply_to_id: string | null;
         };
         Insert: {
           author_id: string;
@@ -251,6 +252,7 @@ export type Database = {
           created_at?: string;
           edited_at?: string | null;
           id?: string;
+          reply_to_id?: string | null;
         };
         Update: {
           author_id?: string;
@@ -259,6 +261,7 @@ export type Database = {
           created_at?: string;
           edited_at?: string | null;
           id?: string;
+          reply_to_id?: string | null;
         };
         Relationships: [
           {
@@ -431,6 +434,7 @@ export type Database = {
           created_at: string;
           edited_at: string | null;
           id: string;
+          reply_to_id: string | null;
         };
         Insert: {
           author_id: string;
@@ -439,6 +443,7 @@ export type Database = {
           created_at?: string;
           edited_at?: string | null;
           id?: string;
+          reply_to_id?: string | null;
         };
         Update: {
           author_id?: string;
@@ -447,6 +452,7 @@ export type Database = {
           created_at?: string;
           edited_at?: string | null;
           id?: string;
+          reply_to_id?: string | null;
         };
         Relationships: [
           {

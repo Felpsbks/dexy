@@ -325,3 +325,48 @@ html.dexy-desktop .min-h-screen {
 html.dexy-desktop .fixed.top-4 {
   top: calc(1rem + 2rem);
 }
+
+/* Jump-to-reply highlight. */
+.dexy-msg-flash {
+  animation: dexy-msg-flash 1.6s ease-out;
+}
+@keyframes dexy-msg-flash {
+  0%,
+  30% {
+    background-color: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* "está digitando..." dots. */
+.dexy-typing-dots {
+  display: inline-flex;
+  gap: 2px;
+}
+.dexy-typing-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: dexy-typing 1.2s infinite ease-in-out;
+}
+.dexy-typing-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dexy-typing-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes dexy-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
