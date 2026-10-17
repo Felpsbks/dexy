@@ -18,6 +18,7 @@ import { useReconnectingSound, useScreenShareSound, useMuteToggleSound } from "@
 import { avatarFor } from "@/lib/format";
 import { SpeakingAwareAvatar } from "@/components/SpeakingAwareAvatar";
 import type { MemberWithProfile } from "@/lib/queries";
+import { ScreenShareQualityPicker, useScreenShareQuality } from "@/components/ScreenShareQualityPicker";
 
 function TrackVideo({ track, muted }: { track: Track | undefined; muted?: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -158,30 +159,6 @@ function ScreenShareBanner({ onSwap, onStop }: { onSwap: () => void; onStop: () 
   );
 }
 
-function ScreenShareQualityToggle({
-  value,
-  onChange,
-}: {
-  value: ScreenShareQuality;
-  onChange: (q: ScreenShareQuality) => void;
-}) {
-  return (
-    <div className="flex items-center rounded-full bg-secondary p-0.5 text-[10px] font-semibold">
-      {(["1080p", "4k"] as const).map((q) => (
-        <button
-          key={q}
-          onClick={() => onChange(q)}
-          className={`px-2 py-1 rounded-full transition ${
-            value === q ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {q === "4k" ? "4K" : "HD"}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function ControlButton({
   active,
   onClick,
@@ -225,7 +202,11 @@ export function VoiceRoomView({
   onVoiceChange?: (voice: VoiceRoomHook | null) => void;
 }) {
   const voice = useVoiceRoom(channelId);
-  const [screenShareQuality, setScreenShareQuality] = useState<ScreenShareQuality>("1080p");
+  const [screenShareQuality, saveScreenShareQuality] = useScreenShareQuality();
+  const setScreenShareQuality = (q: ScreenShareQuality) => {
+    saveScreenShareQuality(q);
+    if (voice.screenShareEnabled) void voice.setScreenShareQuality(q);
+  };
   const avatarByUserId = useMemo(
     () => new Map(members.map((m) => [m.user_id, m.profile.avatar_url])),
     [members],
@@ -360,9 +341,7 @@ export function VoiceRoomView({
           offIcon={VideoOff}
           label="Câmera"
         />
-        {!voice.screenShareEnabled && (
-          <ScreenShareQualityToggle value={screenShareQuality} onChange={setScreenShareQuality} />
-        )}
+                <ScreenShareQualityPicker value={screenShareQuality} onChange={setScreenShareQuality} />
         <ControlButton
           active={voice.screenShareEnabled}
           onClick={() =>

@@ -673,6 +673,7 @@ export function DmChatView({
               onToggleCamera={dmCall.toggleCamera}
               onToggleScreenShare={dmCall.toggleScreenShare}
               onStopScreenShare={dmCall.stopScreenShare}
+              onSetScreenShareQuality={dmCall.setScreenShareQuality}
               onHangup={dmCall.hangup}
               deafened={deafened}
               fillAvailableHeight={screenShareActive}

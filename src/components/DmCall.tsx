@@ -28,6 +28,7 @@ import {
 } from "@/lib/livekit";
 import { avatarFor } from "@/lib/format";
 import { SpeakingAwareAvatar } from "@/components/SpeakingAwareAvatar";
+import { ScreenShareQualityPicker, useScreenShareQuality } from "@/components/ScreenShareQualityPicker";
 import type { Database } from "@/lib/database.types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -330,30 +331,6 @@ function ScreenShareStage({
   );
 }
 
-function ScreenShareQualityToggle({
-  value,
-  onChange,
-}: {
-  value: ScreenShareQuality;
-  onChange: (q: ScreenShareQuality) => void;
-}) {
-  return (
-    <div className="flex items-center rounded-full bg-secondary p-0.5 text-[10px] font-semibold">
-      {(["1080p", "4k"] as const).map((q) => (
-        <button
-          key={q}
-          onClick={() => onChange(q)}
-          className={`px-2 py-1 rounded-full transition ${
-            value === q ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {q === "4k" ? "4K" : "HD"}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function ControlButton({
   active,
   onClick,
@@ -583,6 +560,7 @@ export function ActiveCallView({
   onToggleCamera,
   onToggleScreenShare,
   onStopScreenShare,
+  onSetScreenShareQuality,
   onHangup,
   deafened,
   fillAvailableHeight,
@@ -600,6 +578,7 @@ export function ActiveCallView({
   onToggleCamera: () => void;
   onToggleScreenShare: (quality?: ScreenShareQuality) => void;
   onStopScreenShare: () => void;
+  onSetScreenShareQuality: (quality: ScreenShareQuality) => void;
   onHangup: () => void;
   deafened?: boolean;
   // True while someone is screen-sharing: the card should consume whatever
@@ -609,7 +588,11 @@ export function ActiveCallView({
   fillAvailableHeight?: boolean;
   aloneSince?: number | null;
 }) {
-  const [screenShareQuality, setScreenShareQuality] = useState<ScreenShareQuality>("1080p");
+  const [screenShareQuality, saveScreenShareQuality] = useScreenShareQuality();
+  const setScreenShareQuality = (q: ScreenShareQuality) => {
+    saveScreenShareQuality(q);
+    if (screenShareEnabled) onSetScreenShareQuality(q);
+  };
   const profileFor = (identity: string) => (identity === myProfile.id ? myProfile : otherProfile);
   const sharingParticipant = participants.find((p) => p.screenShareTrack);
   const hasVideo = participants.some((p) => p.cameraTrack);
@@ -712,9 +695,7 @@ export function ActiveCallView({
           offIcon={VideoOff}
           label="Câmera"
         />
-        {!screenShareEnabled && (
-          <ScreenShareQualityToggle value={screenShareQuality} onChange={setScreenShareQuality} />
-        )}
+                <ScreenShareQualityPicker value={screenShareQuality} onChange={setScreenShareQuality} />
         <ControlButton
           active={screenShareEnabled}
           onClick={() =>

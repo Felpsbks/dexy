@@ -278,17 +278,62 @@ function toInfo(p: Participant): ParticipantInfo {
 // outrunning a bitrate sized for 30fps. Simulcast stays off so the one
 // layer sent is always the full-quality one, never adapted down to
 // whatever the smallest viewer's tile happens to render at.
-export const SCREEN_SHARE_QUALITIES = {
-  "1080p": {
-    resolution: { width: 1920, height: 1080, frameRate: 60 },
-    encoding: { maxBitrate: 7_000_000, maxFramerate: 60 },
-  },
-  "4k": {
-    resolution: { width: 3840, height: 2160, frameRate: 60 },
-    encoding: { maxBitrate: 16_000_000, maxFramerate: 60 },
-  },
-} as const;
-export type ScreenShareQuality = keyof typeof SCREEN_SHARE_QUALITIES;
+// Same choices as Discord's Go Live: a resolution tier (or "source" = the
+// monitor's native resolution, uncapped) and 30/60 fps. Bitrate scales with
+// pixels x fps (~7 Mbps at 1080p60, capped at 20 Mbps for 4K).
+export type ScreenShareResolution = "720p" | "1080p" | "1440p" | "source";
+export interface ScreenShareQuality {
+  resolution: ScreenShareResolution;
+  fps: 30 | 60;
+}
+export const DEFAULT_SCREEN_SHARE_QUALITY: ScreenShareQuality = { resolution: "1080p", fps: 60 };
+const RESOLUTION_SIZES: Record<Exclude<ScreenShareResolution, "source">, [number, number]> = {
+  "720p": [1280, 720],
+  "1080p": [1920, 1080],
+  "1440p": [2560, 1440],
+};
+
+export function screenSharePreset(q: ScreenShareQuality) {
+  const [w, h] =
+    q.resolution === "source"
+      ? [Math.round(screen.width * devicePixelRatio), Math.round(screen.height * devicePixelRatio)]
+      : RESOLUTION_SIZES[q.resolution];
+  const maxBitrate = Math.round(Math.min(20_000_000, Math.max(2_500_000, w * h * q.fps * 0.056)));
+  return {
+    // width/height 0 = uncapped in livekit-client: capture at native size.
+    resolution:
+      q.resolution === "source"
+        ? { width: 0, height: 0, frameRate: q.fps }
+        : { width: w, height: h, frameRate: q.fps },
+    encoding: { maxBitrate, maxFramerate: q.fps },
+  };
+}
+
+// Live quality change while already sharing: new capture constraints plus new
+// encoder limits, no new getDisplayMedia (so no second source picker).
+export async function applyScreenShareQuality(room: Room | null, q: ScreenShareQuality) {
+  const pub = room?.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+  const track = pub?.videoTrack;
+  if (!track) return;
+  const preset = screenSharePreset(q);
+  const r = preset.resolution;
+  await track.mediaStreamTrack
+    .applyConstraints(
+      // applyConstraints replaces the whole set: leaving width/height out
+      // returns the capture to the monitor's native size.
+      r.width > 0
+        ? { width: { ideal: r.width }, height: { ideal: r.height }, frameRate: q.fps }
+        : { frameRate: q.fps },
+    )
+    .catch((err) => console.warn("applyConstraints failed", err));
+  const sender = track.sender;
+  if (!sender) return;
+  const params = sender.getParameters();
+  if (!params.encodings?.length) params.encodings = [{}];
+  params.encodings[0].maxBitrate = preset.encoding.maxBitrate;
+  params.encodings[0].maxFramerate = preset.encoding.maxFramerate;
+  await sender.setParameters(params).catch((err) => console.warn("setParameters failed", err));
+}
 
 // LiveKit's publication state doesn't reliably follow the underlying
 // MediaStreamTrack when it ends on its own -- confirmed empirically:
@@ -339,10 +384,10 @@ function watchScreenShareEnded(room: Room, onEnded: () => void) {
 // Actually stopping is a separate, unambiguous action (see stopScreenShare).
 async function swapOrStartScreenShare(
   room: Room,
-  quality: ScreenShareQuality = "1080p",
+  quality: ScreenShareQuality = DEFAULT_SCREEN_SHARE_QUALITY,
   onEnded?: () => void,
 ) {
-  const preset = SCREEN_SHARE_QUALITIES[quality];
+  const preset = screenSharePreset(quality);
   const captureOptions = {
     audio: true,
     resolution: preset.resolution,
@@ -361,6 +406,7 @@ async function swapOrStartScreenShare(
   const lp = room.localParticipant;
   if (!lp.isScreenShareEnabled) {
     await lp.setScreenShareEnabled(true, captureOptions, publishOptions);
+    if (quality.resolution === "source") await applyScreenShareQuality(room, quality);
     if (onEnded) watchScreenShareEnded(room, onEnded);
     return;
   }
@@ -372,6 +418,7 @@ async function swapOrStartScreenShare(
   for (const track of newTracks) {
     await lp.publishTrack(track, track.source === Track.Source.ScreenShare ? publishOptions : undefined);
   }
+  if (quality.resolution === "source") await applyScreenShareQuality(room, quality);
   if (onEnded) watchScreenShareEnded(room, onEnded);
 }
 
@@ -423,6 +470,7 @@ export interface VoiceRoomHook {
   toggleCamera: () => Promise<void>;
   toggleScreenShare: (quality?: ScreenShareQuality) => Promise<void>;
   stopScreenShare: () => Promise<void>;
+  setScreenShareQuality: (quality: ScreenShareQuality) => Promise<void>;
 }
 
 export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
@@ -615,7 +663,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     forceTick();
   }, []);
 
-  const toggleScreenShare = useCallback(async (quality: ScreenShareQuality = "1080p") => {
+  const toggleScreenShare = useCallback(async (quality: ScreenShareQuality = DEFAULT_SCREEN_SHARE_QUALITY) => {
     const room = roomRef.current;
     if (!room) return;
     try {
@@ -631,6 +679,10 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     if (!room) return;
     await stopScreenShare(room);
     forceTick();
+  }, []);
+
+  const setScreenShareQuality = useCallback(async (q: ScreenShareQuality) => {
+    await applyScreenShareQuality(roomRef.current, q);
   }, []);
 
   const room = roomRef.current;
@@ -658,6 +710,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     toggleCamera,
     toggleScreenShare,
     stopScreenShare: stopScreenShareAction,
+    setScreenShareQuality,
   };
 }
 
@@ -737,6 +790,7 @@ export interface DmCallHook {
   toggleCamera: () => Promise<void>;
   toggleScreenShare: (quality?: ScreenShareQuality) => Promise<void>;
   stopScreenShare: () => Promise<void>;
+  setScreenShareQuality: (quality: ScreenShareQuality) => Promise<void>;
 }
 
 // Shared by the mount-effect auto-heal below and by start() (Etapa 6.10):
@@ -1278,7 +1332,7 @@ export function useDmCall(
     forceTick();
   }, []);
 
-  const toggleScreenShare = useCallback(async (quality: ScreenShareQuality = "1080p") => {
+  const toggleScreenShare = useCallback(async (quality: ScreenShareQuality = DEFAULT_SCREEN_SHARE_QUALITY) => {
     const room = roomRef.current;
     if (!room) return;
     try {
@@ -1294,6 +1348,10 @@ export function useDmCall(
     if (!room) return;
     await stopScreenShare(room);
     forceTick();
+  }, []);
+
+  const setScreenShareQuality = useCallback(async (q: ScreenShareQuality) => {
+    await applyScreenShareQuality(roomRef.current, q);
   }, []);
 
   const room = roomRef.current;
@@ -1327,5 +1385,6 @@ export function useDmCall(
     toggleCamera,
     toggleScreenShare,
     stopScreenShare: stopScreenShareAction,
+    setScreenShareQuality,
   };
 }
