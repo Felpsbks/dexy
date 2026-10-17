@@ -18,6 +18,7 @@ import { useReconnectingSound, useScreenShareSound, useMuteToggleSound } from "@
 import { avatarFor } from "@/lib/format";
 import { SpeakingAwareAvatar } from "@/components/SpeakingAwareAvatar";
 import type { MemberWithProfile } from "@/lib/queries";
+import { ParticipantContextMenu, RemoteAudio } from "@/components/RemoteAudio";
 import { ScreenShareQualityPicker, useScreenShareQuality } from "@/components/ScreenShareQualityPicker";
 
 function TrackVideo({ track, muted }: { track: Track | undefined; muted?: boolean }) {
@@ -32,28 +33,6 @@ function TrackVideo({ track, muted }: { track: Track | undefined; muted?: boolea
   }, [track]);
   return (
     <video ref={ref} muted={muted} autoPlay playsInline className="w-full h-full object-cover" />
-  );
-}
-
-function TrackAudio({ track, muted }: { track: Track | undefined; muted?: boolean }) {
-  const ref = useRef<HTMLAudioElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !track) return;
-    track.attach(el);
-    return () => {
-      track.detach(el);
-    };
-  }, [track]);
-  return (
-    <audio
-      ref={ref}
-      autoPlay
-      muted={muted}
-      // Audio element optimizations for voice clarity
-      playsInline
-      crossOrigin="anonymous"
-    />
   );
 }
 
@@ -96,15 +75,16 @@ function ParticipantTile({
   const videoTrack = p.screenShareTrack ?? p.cameraTrack;
   const tileRef = useRef<HTMLDivElement>(null);
   return (
+    <ParticipantContextMenu userId={p.identity} name={p.name} isLocal={p.isLocal} kinds={p.screenShareTrack ? ["voice", "stream"] : ["voice"]}>
     <div
       ref={tileRef}
       className={`group relative aspect-video rounded-xl overflow-hidden bg-card border transition ${
         p.isSpeaking ? "border-primary shadow-[var(--shadow-glow)]" : "border-border"
       }`}
     >
-      {!p.isLocal && <TrackAudio track={p.micTrack} muted={deafened} />}
+      {!p.isLocal && <RemoteAudio track={p.micTrack} userId={p.identity} kind="voice" deafened={deafened} />}
       {!p.isLocal && p.screenShareTrack && (
-        <TrackAudio track={p.screenShareAudioTrack} muted={deafened} />
+        <RemoteAudio track={p.screenShareAudioTrack} userId={p.identity} kind="stream" deafened={deafened} />
       )}
       {videoTrack ? (
         <>
@@ -132,6 +112,7 @@ function ParticipantTile({
         {p.screenShareTrack && <MonitorUp className="w-3.5 h-3.5 text-primary" />}
       </div>
     </div>
+    </ParticipantContextMenu>
   );
 }
 

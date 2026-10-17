@@ -28,6 +28,7 @@ import {
 } from "@/lib/livekit";
 import { avatarFor } from "@/lib/format";
 import { SpeakingAwareAvatar } from "@/components/SpeakingAwareAvatar";
+import { ParticipantContextMenu, RemoteAudio } from "@/components/RemoteAudio";
 import { ScreenShareQualityPicker, useScreenShareQuality } from "@/components/ScreenShareQualityPicker";
 import type { Database } from "@/lib/database.types";
 
@@ -58,28 +59,6 @@ function TrackVideo({
       autoPlay
       playsInline
       className={`w-full h-full ${contain ? "object-contain" : "object-cover"}`}
-    />
-  );
-}
-
-function TrackAudio({ track, muted }: { track: Track | undefined; muted?: boolean }) {
-  const ref = useRef<HTMLAudioElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !track) return;
-    track.attach(el);
-    return () => {
-      track.detach(el);
-    };
-  }, [track]);
-  return (
-    <audio
-      ref={ref}
-      autoPlay
-      muted={muted}
-      // Audio element optimizations for voice clarity
-      playsInline
-      crossOrigin="anonymous"
     />
   );
 }
@@ -122,15 +101,16 @@ function ParticipantTile({
   const videoTrack = p.screenShareTrack ?? p.cameraTrack;
   const tileRef = useRef<HTMLDivElement>(null);
   return (
+    <ParticipantContextMenu userId={p.identity} name={p.name || fallbackProfile.name} isLocal={p.isLocal} kinds={p.screenShareTrack ? ["voice", "stream"] : ["voice"]}>
     <div
       ref={tileRef}
       className={`group relative aspect-video rounded-2xl overflow-hidden bg-secondary border transition ${
         p.isSpeaking ? "border-primary shadow-[var(--shadow-glow)]" : "border-border"
       }`}
     >
-      {!p.isLocal && <TrackAudio track={p.micTrack} muted={deafened} />}
+      {!p.isLocal && <RemoteAudio track={p.micTrack} userId={p.identity} kind="voice" deafened={deafened} />}
       {!p.isLocal && p.screenShareTrack && (
-        <TrackAudio track={p.screenShareAudioTrack} muted={deafened} />
+        <RemoteAudio track={p.screenShareAudioTrack} userId={p.identity} kind="stream" deafened={deafened} />
       )}
       {videoTrack ? (
         <>
@@ -157,6 +137,7 @@ function ParticipantTile({
         <span className="truncate max-w-32">{p.name}</span>
       </div>
     </div>
+    </ParticipantContextMenu>
   );
 }
 
@@ -176,6 +157,7 @@ function FloatingParticipantCard({
   deafened?: boolean;
 }) {
   return (
+    <ParticipantContextMenu userId={p.identity} name={p.name || fallbackProfile.name} isLocal={p.isLocal} kinds={["voice"]}>
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.9 }}
@@ -186,7 +168,7 @@ function FloatingParticipantCard({
         p.isSpeaking ? "border-primary shadow-(--shadow-glow)" : "border-white/10"
       }`}
     >
-      {!p.isLocal && <TrackAudio track={p.micTrack} muted={deafened} />}
+      {!p.isLocal && <RemoteAudio track={p.micTrack} userId={p.identity} kind="voice" deafened={deafened} />}
       {p.isSpeaking && <AudioLines className="absolute top-3 right-3 w-3.5 h-3.5 text-primary" />}
       {p.cameraTrack ? (
         <div className="w-12 h-12 rounded-full overflow-hidden">
@@ -218,6 +200,7 @@ function FloatingParticipantCard({
         </div>
       </div>
     </motion.div>
+    </ParticipantContextMenu>
   );
 }
 
@@ -242,6 +225,7 @@ function ScreenShareStage({
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   return (
+    <ParticipantContextMenu userId={sharer.identity} name={sharer.name || profileFor(sharer.identity).name} isLocal={sharer.isLocal} kinds={["stream", "voice"]}>
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.97 }}
@@ -303,7 +287,7 @@ function ScreenShareStage({
             LiveKit but never actually played for anyone. Never rendered for
             the local sharer themselves (no self-echo of your own shared
             audio); respects deafen exactly like the mic track does. */}
-        {!sharer.isLocal && <TrackAudio track={sharer.screenShareAudioTrack} muted={deafened} />}
+        {!sharer.isLocal && <RemoteAudio track={sharer.screenShareAudioTrack} userId={sharer.identity} kind="stream" deafened={deafened} />}
         <FullscreenButton targetRef={stageRef} />
       </div>
 
@@ -328,6 +312,7 @@ function ScreenShareStage({
         </AnimatePresence>
       </div>
     </motion.div>
+    </ParticipantContextMenu>
   );
 }
 
@@ -649,6 +634,7 @@ export function ActiveCallView({
             className="flex items-center justify-center flex-wrap gap-x-10 gap-y-6 py-10"
           >
             {participants.map((p) => (
+              <ParticipantContextMenu key={p.identity} userId={p.identity} name={p.name || profileFor(p.identity).name} isLocal={p.isLocal} kinds={["voice"]}>
               <motion.div
                 key={p.identity}
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -656,7 +642,7 @@ export function ActiveCallView({
                 transition={{ duration: 0.25, ease: "easeOut" }}
                 className="flex flex-col items-center gap-2.5"
               >
-                {!p.isLocal && <TrackAudio track={p.micTrack} muted={deafened} />}
+                {!p.isLocal && <RemoteAudio track={p.micTrack} userId={p.identity} kind="voice" deafened={deafened} />}
                 <div className="relative">
                   {p.isSpeaking && (
                     <span className="absolute -inset-1.5 rounded-full bg-primary/30 blur-md animate-pulse" />
@@ -676,6 +662,7 @@ export function ActiveCallView({
                 </div>
                 <span className="text-sm font-medium truncate max-w-24">{p.name}</span>
               </motion.div>
+              </ParticipantContextMenu>
             ))}
           </div>
         )}
