@@ -68,6 +68,7 @@ import { DmProfilePanel } from "@/components/DmProfilePanel";
 import { ProfileEditor } from "@/components/ProfileEditor";
 import { LinkAccountDialog } from "@/components/LinkAccountDialog";
 import { AudioDeviceSelector } from "@/components/AudioDeviceSelector";
+import { VoiceVideoSettings } from "@/components/VoiceVideoSettings";
 import { ReactionButton, ReactionList, ReactionPicker } from "@/components/MessageReactions";
 import { ProfilePopoverProvider, useProfilePopover } from "@/components/ProfilePopover";
 import {
@@ -3893,7 +3894,7 @@ function SettingsView({
   ) => void;
   onClose: () => void;
 }) {
-  const tabs = ["Aparência", "Tema", "Idioma", "Notificações", "Perfil"];
+  const tabs = ["Aparência", "Tema", "Idioma", "Voz e vídeo", "Notificações", "Perfil"];
   const [tab, setTab] = useState(tabs[0]);
   const [density, setDensity] = useState<"cozy" | "compact">("cozy");
 
@@ -3992,6 +3993,7 @@ function SettingsView({
               </select>
             </SettingRow>
           )}
+          {tab === "Voz e vídeo" && <VoiceVideoSettings />}
           {tab === "Notificações" && (
             <div className="space-y-3">
               {NOTIF_ROWS.map(({ key, label, desc }) => (

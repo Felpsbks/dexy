@@ -16,6 +16,7 @@ import {
   type VideoCaptureOptions,
 } from "livekit-client";
 import { getSelectedAudioDevice } from "./audio-devices";
+import { getVoiceSettings, onVoiceSettingsChange } from "./voice-settings";
 
 // Discord uses ~128kbps Opus for voice channels. LiveKit's
 // musicHighQualityStereo preset matches that: 128kbps stereo, which gives a
@@ -110,12 +111,18 @@ const MIC_CAPTURE_BASE_OPTIONS: AudioCaptureOptions = {
 // device selection falls back to getSelectedAudioDevice()'s own auto-detect.
 async function buildMicCaptureOptions(): Promise<AudioCaptureOptions> {
   const selected = await getSelectedAudioDevice().catch(() => null);
+  const prefs = getVoiceSettings();
   return {
     ...MIC_CAPTURE_BASE_OPTIONS,
-    voiceIsolation: true,
+    echoCancellation: prefs.echoCancellation,
+    autoGainControl: prefs.autoGainControl,
+    noiseSuppression: prefs.noiseSuppression !== "off",
+    voiceIsolation: prefs.noiseSuppression !== "off",
     ...(selected ? { deviceId: selected.deviceId } : {}),
   };
 }
+
+const roomsWithMic = new Set<Room>();
 
 // Krisp noise suppression, applied to the already-published mic track rather
 // than passed as `processor` in the capture options: livekit-client 2.21
@@ -128,11 +135,21 @@ async function applyKrispNoiseFilter(room: Room) {
   // crashed SSR on Cloudflare Workers with a 500 on every page.
   if (import.meta.env.SSR) return;
   const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
-  if (!track || track.getProcessor()) return;
+  if (!track) return;
+  const wantKrisp = getVoiceSettings().noiseSuppression === "krisp";
+  if (!wantKrisp) {
+    if (track.getProcessor()) await track.stopProcessor().catch(() => {});
+    return;
+  }
+  if (track.getProcessor()) return;
   try {
     const krisp = await import("@livekit/krisp-noise-filter");
     if (!krisp.isKrispNoiseFilterSupported()) return;
-    await track.setProcessor(krisp.KrispNoiseFilter({ quality: "medium" }));
+    // "high" measured ~-80..-105 dB on keyboard/game noise vs ~-37 dB for
+    // "medium", main voice unchanged. BVC (background voice cancellation, the
+    // same model family as Discord's krisp-bvc-o-pro) only engages on mics in
+    // Krisp's compatible-device list and silently stays off otherwise.
+    await track.setProcessor(krisp.KrispNoiseFilter({ quality: "high", useBVC: true }));
   } catch (err) {
     console.warn("Krisp noise filter unavailable, continuing without it", err);
   }
@@ -140,7 +157,30 @@ async function applyKrispNoiseFilter(room: Room) {
 
 async function enableMic(room: Room, enabled: boolean) {
   await room.localParticipant.setMicrophoneEnabled(enabled, await buildMicCaptureOptions());
-  if (enabled) void applyKrispNoiseFilter(room);
+  if (enabled) {
+    roomsWithMic.add(room);
+    void applyKrispNoiseFilter(room);
+  }
+}
+
+// Settings changed mid-call: re-capture with the new constraints and add or
+// drop Krisp on every live mic, without leaving the call.
+if (typeof window !== "undefined") {
+  onVoiceSettingsChange(() => {
+    for (const room of roomsWithMic) {
+      if (room.state === "disconnected") {
+        roomsWithMic.delete(room);
+        continue;
+      }
+      const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
+      if (!track) continue;
+      void (async () => {
+        await track.stopProcessor().catch(() => {});
+        await track.restartTrack(await buildMicCaptureOptions()).catch((err) => console.warn("mic restart failed", err));
+        await applyKrispNoiseFilter(room);
+      })();
+    }
+  });
 }
 
 // getUserMedia/getDisplayMedia reject with a DOMException whose .name is one
