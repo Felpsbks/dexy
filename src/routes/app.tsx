@@ -69,6 +69,7 @@ import { ProfileEditor } from "@/components/ProfileEditor";
 import { LinkAccountDialog } from "@/components/LinkAccountDialog";
 import { AudioDeviceSelector } from "@/components/AudioDeviceSelector";
 import { VoiceVideoSettings } from "@/components/VoiceVideoSettings";
+import { DesktopSettings } from "@/components/DesktopSettings";
 import { ReactionButton, ReactionList, ReactionPicker } from "@/components/MessageReactions";
 import { ProfilePopoverProvider, useProfilePopover } from "@/components/ProfilePopover";
 import {
@@ -119,6 +120,7 @@ import { useSession } from "@/lib/auth";
 import { markGuestSignedOut } from "@/lib/guestDevice";
 import { buildVersionLabel } from "@/lib/app-version";
 import { declineDmCall, useIncomingDmCall } from "@/lib/incoming-call";
+import { getDesktop, notifyNative } from "@/lib/desktop";
 import { IncomingCallCard } from "@/components/DmCall";
 import {
   useAddAttachment,
@@ -351,6 +353,15 @@ function AppPage() {
       dmCall.call?.id === incomingCall.id &&
       (dmCall.status === "connecting" || dmCall.status === "active")
     );
+
+  useEffect(() => {
+    if (!incomingCall) return;
+    notifyNative("Chamada recebida", `${incomingCaller?.name ?? "Alguém"} está te ligando`, () => {
+      setRailMode("dm");
+      setView("chat");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingCall?.id]);
 
   const acceptIncomingCall = async () => {
     if (!incomingCall) return;
@@ -630,6 +641,35 @@ function AppPage() {
     dragOriginRef.current = null;
   }
 
+  // Desktop app integration: taskbar unread badge, native notifications for
+  // new notifications while Dexy is unfocused, and global mute/deafen keys.
+  const desktopUnread = notifications.filter((n) => !n.read).length;
+  useEffect(() => getDesktop()?.setBadge(desktopUnread), [desktopUnread]);
+  const notifClickRef = useRef<(n: Notification) => void>(() => {});
+  const seenNotifRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!seenNotifRef.current) {
+      seenNotifRef.current = new Set(notifications.map((n) => n.id));
+      return;
+    }
+    for (const n of notifications) {
+      if (seenNotifRef.current.has(n.id)) continue;
+      seenNotifRef.current.add(n.id);
+      if (!n.read) notifyNative("Dexy", n.text, () => notifClickRef.current(n));
+    }
+  }, [notifications]);
+  const shortcutCallRef = useRef<{ toggleMic: () => Promise<void> } | null>(null);
+  shortcutCallRef.current =
+    dmCall.status !== "idle" ? dmCall : activeVoice?.status === "connected" ? activeVoice : null;
+  useEffect(() => {
+    const d = getDesktop();
+    if (!d) return;
+    return d.onShortcut((action) => {
+      if (action === "toggle-mute") void shortcutCallRef.current?.toggleMic();
+      else setDeafened((v) => !v);
+    });
+  }, []);
+
   if (session === undefined) {
     return <LoadingScreen />;
   }
@@ -706,6 +746,7 @@ function AppPage() {
     setPendingFile(file);
   };
 
+  notifClickRef.current = (n: Notification) => handleNotificationClick(n);
   const handleNotificationClick = (n: Notification) => {
     markNotificationRead.mutate(n.id);
     if (n.type === "dm_message" && n.related_id) {
@@ -3894,7 +3935,7 @@ function SettingsView({
   ) => void;
   onClose: () => void;
 }) {
-  const tabs = ["Aparência", "Tema", "Idioma", "Voz e vídeo", "Notificações", "Perfil"];
+  const tabs = ["Aparência", "Tema", "Idioma", "Voz e vídeo", ...(getDesktop() ? ["Windows"] : []), "Notificações", "Perfil"];
   const [tab, setTab] = useState(tabs[0]);
   const [density, setDensity] = useState<"cozy" | "compact">("cozy");
 
@@ -3994,6 +4035,7 @@ function SettingsView({
             </SettingRow>
           )}
           {tab === "Voz e vídeo" && <VoiceVideoSettings />}
+          {tab === "Windows" && <DesktopSettings />}
           {tab === "Notificações" && (
             <div className="space-y-3">
               {NOTIF_ROWS.map(({ key, label, desc }) => (

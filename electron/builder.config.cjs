@@ -2,15 +2,22 @@
 module.exports = {
   appId: "site.dexy.desktop",
   productName: "Dexy",
-  files: ["dist-electron/**/*"],
+  copyright: "© Dexy",
+  files: ["dist-electron/**/*", "electron/assets/**/*"],
   directories: { output: "release" },
+  afterPack: "./electron/after-pack.cjs",
   win: {
     target: ["nsis"],
-    icon: "public/icon-512.png",
+    icon: "electron/assets/icon.ico",
     signAndEditExecutable: false,
   },
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
+    installerIcon: "electron/assets/icon.ico",
+    uninstallerIcon: "electron/assets/icon.ico",
+    installerHeaderIcon: "electron/assets/icon.ico",
+    shortcutName: "Dexy",
+    uninstallDisplayName: "Dexy",
   },
 };

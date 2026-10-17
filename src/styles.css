@@ -309,3 +309,19 @@
     animation: none;
   }
 }
+
+/* Desktop app (Electron): a 32px custom title bar sits above the page. */
+html.dexy-desktop body {
+  padding-top: 2rem;
+}
+html.dexy-desktop .h-dvh,
+html.dexy-desktop .h-screen {
+  height: calc(100dvh - 2rem);
+}
+html.dexy-desktop .min-h-dvh,
+html.dexy-desktop .min-h-screen {
+  min-height: calc(100dvh - 2rem);
+}
+html.dexy-desktop .fixed.top-4 {
+  top: calc(1rem + 2rem);
+}
