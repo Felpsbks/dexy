@@ -114,7 +114,15 @@ import {
   statusLabel,
   type UserStatus,
 } from "@/lib/format";
-import { useIsUserOnline, useOnlineUserIds, usePresenceConnection } from "@/lib/presence";
+import {
+  useDesktopActivity,
+  useIsUserOnline,
+  useOnlineUserIds,
+  usePresenceConnection,
+  useUserActivities,
+  useUserActivity,
+} from "@/lib/presence";
+import { MentionSuggest, mentionMatches, mentionQuery } from "@/components/MentionSuggest";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/auth";
 import { markGuestSignedOut } from "@/lib/guestDevice";
@@ -248,6 +256,7 @@ function AppPage() {
   const reorderChannels = useReorderChannels();
   const [activeChannel, setActiveChannel] = useState<string | undefined>(undefined);
   const { data: members = [] } = useMembers(activeServer);
+  const mentionable = useMemo(() => members.map((m) => m.profile), [members]);
   const { data: serverRoles = [] } = useServerRoles(activeServer);
   const assignRole = useAssignRole();
   const { hasPermission } = usePermissions(activeServer, userId);
@@ -268,6 +277,7 @@ function AppPage() {
   // profile.status (the manual online/idle/dnd/offline preference). See
   // src/lib/presence.ts.
   usePresenceConnection(userId);
+  useDesktopActivity();
 
   const [draft, setDraft] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -1348,6 +1358,7 @@ function AppPage() {
                       myId={userId}
                       myName={profile.name}
                       channelName={channel.name}
+                      mentionable={mentionable}
                       value={draft}
                       onChange={setDraft}
                       onSend={send}
@@ -1518,6 +1529,7 @@ function AppPage() {
 function OwnProfileBarButton({ profile }: { profile: Profile }) {
   const { open } = useProfilePopover();
   const isOnline = useIsUserOnline(profile.id);
+  const activity = useUserActivity(profile.id);
   const displayStatus = resolvePresenceStatus(profile.status as UserStatus, isOnline);
   return (
     <button
@@ -1533,7 +1545,9 @@ function OwnProfileBarButton({ profile }: { profile: Profile }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium truncate">{profile.name}</div>
-        <div className="text-xs text-muted-foreground truncate">{statusLabel[displayStatus]}</div>
+        <div className="text-xs text-muted-foreground truncate">
+          {activity ? `Jogando ${activity}` : statusLabel[displayStatus]}
+        </div>
       </div>
     </button>
   );
@@ -3713,6 +3727,7 @@ function Composer({
   myId,
   myName,
   channelName,
+  mentionable,
   value,
   onChange,
   onSend,
@@ -3726,6 +3741,7 @@ function Composer({
   myId: string | undefined;
   myName: string | undefined;
   channelName: string;
+  mentionable: MemberWithProfile["profile"][];
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
@@ -3739,8 +3755,28 @@ function Composer({
   const replyTo = useChannelReply();
   const { typingNames, notifyTyping, notifyStopped } = useTypingIndicator(`channel:${channelId}`, myId, myName);
   const typing = typingLabel(typingNames);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [caret, setCaret] = useState(0);
+  const [activeMention, setActiveMention] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState(false);
+  const mention = mentionDismissed ? null : mentionQuery(value, caret);
+  const suggestions = mention ? mentionMatches(mentionable, mention.query) : [];
+  const pickMention = (p: MemberWithProfile["profile"]) => {
+    if (!mention) return;
+    const inserted = `@${p.handle} `;
+    const next = mention.start + inserted.length;
+    onChange(value.slice(0, mention.start) + inserted + value.slice(caret));
+    setCaret(next);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(next, next);
+    });
+  };
   return (
     <div className="px-2 sm:px-6 pb-1 pt-1">
+      {suggestions.length > 0 && (
+        <MentionSuggest items={suggestions} active={Math.min(activeMention, suggestions.length - 1)} onPick={pickMention} />
+      )}
       {replyTo && (
         <div className="mb-1.5 flex items-center gap-2 rounded-lg bg-secondary/60 px-3 py-1.5 text-xs text-muted-foreground">
           <Reply className="w-3.5 h-3.5 shrink-0" />
@@ -3791,14 +3827,36 @@ function Composer({
         </label>
         <textarea
           id="channel-composer"
+          ref={inputRef}
           rows={1}
           value={value}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onChange={(e) => {
             onChange(e.target.value);
+            setCaret(e.target.selectionStart);
+            setActiveMention(0);
+            setMentionDismissed(false);
             if (e.target.value) notifyTyping();
             else notifyStopped();
           }}
           onKeyDown={(e) => {
+            if (suggestions.length > 0) {
+              const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+              if (step) {
+                e.preventDefault();
+                setActiveMention((i) => (Math.min(i, suggestions.length - 1) + step + suggestions.length) % suggestions.length);
+                return;
+              }
+              if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                pickMention(suggestions[Math.min(activeMention, suggestions.length - 1)]);
+                return;
+              }
+              if (e.key === "Escape") {
+                setMentionDismissed(true);
+                return;
+              }
+            }
             if (e.key === "Escape" && replyTo) {
               setChannelReply(null);
               return;
@@ -3862,6 +3920,7 @@ function MembersPanel({
 }) {
   const { open } = useProfilePopover();
   const onlineIds = useOnlineUserIds();
+  const activities = useUserActivities();
   const grouped = useMemo(() => {
     const g: Record<UserStatus, MemberWithProfile[]> = {
       online: [],
@@ -3936,6 +3995,9 @@ function MembersPanel({
                           <div className={`text-sm truncate ${s === "offline" ? "text-muted-foreground" : "text-foreground"}`}>
                             {m.profile.name}
                           </div>
+                          {activities.get(m.user_id) && (
+                            <div className="text-[11px] text-muted-foreground truncate">Jogando {activities.get(m.user_id)}</div>
+                          )}
                           {m.role && (
                             <div className="flex items-center gap-1 mt-0.5">
                               <span

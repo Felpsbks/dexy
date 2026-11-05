@@ -44,6 +44,12 @@ contextBridge.exposeInMainWorld("dexyDesktop", {
   pickSourceResult: (id: string | null) => ipcRenderer.send("dexy:picker-result", id),
   saveClip: (data: Uint8Array) => ipcRenderer.invoke("dexy:save-clip", data),
   showClip: (file: string) => ipcRenderer.send("dexy:show-clip", file),
+  getActivity: () => ipcRenderer.invoke("dexy:get-activity"),
+  onActivity: (cb: (game: string | null) => void) => {
+    const h = (_e: IpcRendererEvent, game: string | null) => cb(game);
+    ipcRenderer.on("dexy:activity", h);
+    return () => ipcRenderer.removeListener("dexy:activity", h);
+  },
   setPushToTalk: (cfg: { enabled: boolean; code: string }) => ipcRenderer.send("dexy:set-ptt", cfg),
   onPushToTalk: (cb: (down: boolean) => void) => {
     const h = (_e: IpcRendererEvent, down: boolean) => cb(!!down);

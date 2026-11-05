@@ -67,7 +67,7 @@ import {
   statusRing,
   type UserStatus,
 } from "@/lib/format";
-import { useIsUserOnline, useOnlineUserIds } from "@/lib/presence";
+import { useIsUserOnline, useUserActivity, useOnlineUserIds } from "@/lib/presence";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -397,6 +397,7 @@ export function DmChatView({
   const myId = myProfile.id;
   const { open: openProfilePopover } = useProfilePopover();
   const otherIsOnline = useIsUserOnline(otherProfile.id);
+  const otherActivity = useUserActivity(otherProfile.id);
   const otherDisplayStatus = resolvePresenceStatus(otherProfile.status as UserStatus, otherIsOnline);
   const { messages, hasOlderMessages, loadingOlderMessages, loadOlderMessages } = useDmMessages(conversationId);
   const { data: calls = [] } = useDmCalls(conversationId);
@@ -640,7 +641,7 @@ export function DmChatView({
                 <div className="text-xs text-primary leading-tight">Chamada em andamento</div>
               ) : (
                 <div className="text-xs text-muted-foreground leading-tight">
-                  {statusLabel[otherDisplayStatus]}
+                  {otherActivity ? `Jogando ${otherActivity}` : statusLabel[otherDisplayStatus]}
                 </div>
               )}
             </div>
@@ -695,6 +696,7 @@ export function DmChatView({
               screenShareEnabled={dmCall.screenShareEnabled}
               onToggleMic={dmCall.toggleMic}
               onToggleCamera={dmCall.toggleCamera}
+              onSound={dmCall.sendSound}
               onToggleScreenShare={dmCall.toggleScreenShare}
               onStopScreenShare={dmCall.stopScreenShare}
               onSetScreenShareQuality={dmCall.setScreenShareQuality}

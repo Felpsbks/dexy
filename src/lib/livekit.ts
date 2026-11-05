@@ -18,6 +18,7 @@ import {
 import { getSelectedAudioDevice } from "./audio-devices";
 import { getVoiceSettings, onVoiceSettingsChange } from "./voice-settings";
 import { startClipBuffer, stopClipBuffer } from "./clips";
+import { SOUNDBOARD_TOPIC, decodeSound, encodeSound, playSound, type SoundId } from "./soundboard";
 
 // Discord uses ~128kbps Opus for voice channels. LiveKit's
 // musicHighQualityStereo preset matches that: 128kbps stereo, which gives a
@@ -548,6 +549,29 @@ export interface VoiceRoomHook {
   toggleScreenShare: (quality?: ScreenShareQuality) => Promise<void>;
   stopScreenShare: () => Promise<void>;
   setScreenShareQuality: (quality: ScreenShareQuality) => Promise<void>;
+  sendSound: (id: SoundId) => void;
+}
+
+// One sound per person at a time, so nobody can spam the whole call.
+const SOUND_COOLDOWN_MS = 500;
+const lastSoundAt = new Map<string, number>();
+function soundAllowed(identity: string) {
+  const now = Date.now();
+  if (now - (lastSoundAt.get(identity) ?? 0) < SOUND_COOLDOWN_MS) return false;
+  lastSoundAt.set(identity, now);
+  return true;
+}
+
+function onSoundboardData(payload: Uint8Array, participant?: RemoteParticipant, _kind?: unknown, topic?: string) {
+  if (topic !== SOUNDBOARD_TOPIC || !participant) return;
+  const id = decodeSound(payload);
+  if (id && soundAllowed(participant.identity)) playSound(id);
+}
+
+function sendSoundboard(room: Room | null, id: SoundId) {
+  if (!room || !soundAllowed(room.localParticipant.identity)) return;
+  playSound(id);
+  void room.localParticipant.publishData(encodeSound(id), { reliable: true, topic: SOUNDBOARD_TOPIC });
 }
 
 export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
@@ -613,6 +637,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
         .on(RoomEvent.LocalTrackPublished, tick)
         .on(RoomEvent.LocalTrackUnpublished, tick)
         .on(RoomEvent.ActiveSpeakersChanged, throttleTrailing(forceTick, 400))
+        .on(RoomEvent.DataReceived, onSoundboardData)
         .on(RoomEvent.Reconnecting, () => setReconnecting(true))
         .on(RoomEvent.Reconnected, () => setReconnecting(false))
         .on(RoomEvent.Disconnected, (reason) => {
@@ -762,6 +787,8 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     await applyScreenShareQuality(roomRef.current, q);
   }, []);
 
+  const sendSound = useCallback((id: SoundId) => sendSoundboard(roomRef.current, id), []);
+
   const room = roomRef.current;
   const participants: ParticipantInfo[] = room
     ? [
@@ -788,6 +815,7 @@ export function useVoiceRoom(channelId: string | undefined): VoiceRoomHook {
     toggleScreenShare,
     stopScreenShare: stopScreenShareAction,
     setScreenShareQuality,
+    sendSound,
   };
 }
 
@@ -868,6 +896,7 @@ export interface DmCallHook {
   toggleScreenShare: (quality?: ScreenShareQuality) => Promise<void>;
   stopScreenShare: () => Promise<void>;
   setScreenShareQuality: (quality: ScreenShareQuality) => Promise<void>;
+  sendSound: (id: SoundId) => void;
 }
 
 // Shared by the mount-effect auto-heal below and by start() (Etapa 6.10):
@@ -1002,6 +1031,7 @@ export function useDmCall(
         .on(RoomEvent.LocalTrackPublished, tick)
         .on(RoomEvent.LocalTrackUnpublished, tick)
         .on(RoomEvent.ActiveSpeakersChanged, throttleTrailing(forceTick, 400))
+        .on(RoomEvent.DataReceived, onSoundboardData)
         .on(RoomEvent.Reconnecting, () => setReconnecting(true))
         .on(RoomEvent.Reconnected, () => setReconnecting(false))
         .on(RoomEvent.Disconnected, (reason) => {
@@ -1431,6 +1461,8 @@ export function useDmCall(
     await applyScreenShareQuality(roomRef.current, q);
   }, []);
 
+  const sendSound = useCallback((id: SoundId) => sendSoundboard(roomRef.current, id), []);
+
   const room = roomRef.current;
   const participants: ParticipantInfo[] = room
     ? [
@@ -1463,5 +1495,6 @@ export function useDmCall(
     toggleScreenShare,
     stopScreenShare: stopScreenShareAction,
     setScreenShareQuality,
+    sendSound,
   };
 }

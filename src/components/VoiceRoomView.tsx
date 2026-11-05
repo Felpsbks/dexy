@@ -19,6 +19,7 @@ import { avatarFor } from "@/lib/format";
 import { SpeakingAwareAvatar } from "@/components/SpeakingAwareAvatar";
 import type { MemberWithProfile } from "@/lib/queries";
 import { ParticipantContextMenu, RemoteAudio } from "@/components/RemoteAudio";
+import { SoundboardButton } from "@/components/SoundboardButton";
 import { SaveClipButton, ScreenShareQualityPicker, useScreenShareQuality } from "@/components/ScreenShareQualityPicker";
 
 function TrackVideo({ track, muted }: { track: Track | undefined; muted?: boolean }) {
@@ -324,6 +325,7 @@ export function VoiceRoomView({
         />
                 <ScreenShareQualityPicker value={screenShareQuality} onChange={setScreenShareQuality} />
         <SaveClipButton sharing={voice.screenShareEnabled} />
+        <SoundboardButton onPlay={voice.sendSound} deafened={deafened} />
         <ControlButton
           active={voice.screenShareEnabled}
           onClick={() =>

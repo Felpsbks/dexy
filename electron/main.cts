@@ -14,6 +14,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { registerDisplayMediaHandler, resetPickerReady } from "./display-media-handler.cjs";
 import { registerPushToTalk } from "./ptt.cjs";
+import { startGameDetection } from "./games.cjs";
 
 const APP_URL = process.env.DEXY_DESKTOP_URL ?? (app.isPackaged ? "https://dexy.site" : "http://localhost:8080");
 const APP_ORIGIN = new URL(APP_URL).origin;
@@ -25,12 +26,14 @@ interface DesktopPrefs {
   minimizeToTray: boolean;
   openOnStartup: boolean;
   startMinimized: boolean;
+  shareActivity: boolean;
   shortcuts: { toggleMute: string; toggleDeafen: string; saveClip: string };
 }
 const DEFAULT_PREFS: DesktopPrefs = {
   minimizeToTray: true,
   openOnStartup: false,
   startMinimized: false,
+  shareActivity: true,
   shortcuts: {
     toggleMute: "CommandOrControl+Shift+M",
     toggleDeafen: "CommandOrControl+Shift+D",
@@ -47,6 +50,7 @@ function loadPrefs(): DesktopPrefs {
   }
 }
 let prefs: DesktopPrefs = DEFAULT_PREFS;
+let games: ReturnType<typeof startGameDetection> | null = null;
 function savePrefs() {
   try {
     fs.writeFileSync(prefsFile(), JSON.stringify(prefs, null, 2));
@@ -186,8 +190,10 @@ function registerIpc(refreshTray: () => void) {
     applyStartup();
     registerShortcuts();
     refreshTray();
+    games?.scan();
     return { ...prefs, version: app.getVersion() };
   });
+  ipcMain.handle("dexy:get-activity", (e) => (fromApp(e) ? (games?.current() ?? null) : null));
   ipcMain.on("dexy:set-badge", (e, count: number, pngDataUrl: string | null) => {
     if (!fromApp(e) || !win) return;
     const n = Math.max(0, Math.floor(Number(count) || 0));
@@ -236,6 +242,8 @@ if (!app.requestSingleInstanceLock()) {
     registerShortcuts();
     const stopPtt = registerPushToTalk(() => win);
     app.on("will-quit", stopPtt);
+    games = startGameDetection(() => win, () => prefs.shareActivity);
+    app.on("will-quit", games.stop);
 
     app.on("activate", () => (win ? showWindow() : createWindow(false)));
   });

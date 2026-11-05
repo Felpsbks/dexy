@@ -29,6 +29,8 @@ import {
 import { avatarFor } from "@/lib/format";
 import { SpeakingAwareAvatar } from "@/components/SpeakingAwareAvatar";
 import { ParticipantContextMenu, RemoteAudio } from "@/components/RemoteAudio";
+import { SoundboardButton } from "@/components/SoundboardButton";
+import type { SoundId } from "@/lib/soundboard";
 import { SaveClipButton, ScreenShareQualityPicker, useScreenShareQuality } from "@/components/ScreenShareQualityPicker";
 import type { Database } from "@/lib/database.types";
 
@@ -543,6 +545,7 @@ export function ActiveCallView({
   screenShareEnabled,
   onToggleMic,
   onToggleCamera,
+  onSound,
   onToggleScreenShare,
   onStopScreenShare,
   onSetScreenShareQuality,
@@ -561,6 +564,7 @@ export function ActiveCallView({
   screenShareEnabled: boolean;
   onToggleMic: () => void;
   onToggleCamera: () => void;
+  onSound: (id: SoundId) => void;
   onToggleScreenShare: (quality?: ScreenShareQuality) => void;
   onStopScreenShare: () => void;
   onSetScreenShareQuality: (quality: ScreenShareQuality) => void;
@@ -684,6 +688,7 @@ export function ActiveCallView({
         />
                 <ScreenShareQualityPicker value={screenShareQuality} onChange={setScreenShareQuality} />
         <SaveClipButton sharing={screenShareEnabled} />
+        <SoundboardButton onPlay={onSound} deafened={deafened} />
         <ControlButton
           active={screenShareEnabled}
           onClick={() =>

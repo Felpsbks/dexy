@@ -58,10 +58,11 @@ export function DesktopSettings() {
     if (next) setPrefs(next);
   };
 
-  const rows: { key: "minimizeToTray" | "openOnStartup" | "startMinimized"; label: string; desc: string }[] = [
+  const rows: { key: "minimizeToTray" | "openOnStartup" | "startMinimized" | "shareActivity"; label: string; desc: string }[] = [
     { key: "minimizeToTray", label: "Minimizar para a bandeja", desc: "Fechar a janela deixa o Dexy rodando no ícone perto do relógio." },
     { key: "openOnStartup", label: "Abrir o Dexy ao iniciar o Windows", desc: "Abre minimizado na bandeja quando você liga o computador." },
     { key: "startMinimized", label: "Iniciar minimizado", desc: "Ao abrir, o Dexy começa só na bandeja." },
+    { key: "shareActivity", label: "Mostrar o jogo que estou jogando", desc: "Quem está no Dexy vê \"Jogando X\" no seu perfil enquanto o jogo estiver aberto." },
   ];
 
   return (
@@ -73,7 +74,7 @@ export function DesktopSettings() {
               <div className="font-medium">{r.label}</div>
               <div className="text-sm text-muted-foreground">{r.desc}</div>
             </div>
-            <Toggle label={r.label} on={prefs[r.key]} onChange={(v) => void update({ [r.key]: v })} />
+            <Toggle label={r.label} on={prefs[r.key] ?? true} onChange={(v) => void update({ [r.key]: v })} />
           </label>
         ))}
       </section>

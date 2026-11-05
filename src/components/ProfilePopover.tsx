@@ -33,7 +33,7 @@ import {
   statusRing,
   type UserStatus,
 } from "@/lib/format";
-import { useIsUserOnline } from "@/lib/presence";
+import { useIsUserOnline, useUserActivity } from "@/lib/presence";
 import { resolveBannerBackground, OBJECT_POSITION, type BannerPosition } from "@/lib/profileMedia";
 import {
   useBlockFriendship,
@@ -182,6 +182,7 @@ function ProfilePopoverCard({
   // means you're connected.
   const manualStatus = profile.status as UserStatus;
   const isOnline = useIsUserOnline(profile.id);
+  const activity = useUserActivity(profile.id);
   const displayStatus = resolvePresenceStatus(manualStatus, isOnline);
   const { data: stats } = useProfileStats(profile.id);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
@@ -229,6 +230,7 @@ function ProfilePopoverCard({
 
         <h3 className="text-base font-bold truncate">{profile.name}</h3>
         <p className="text-sm text-muted-foreground truncate">@{profile.handle}</p>
+        {activity && <p className="mt-1 text-xs font-medium text-primary truncate">Jogando {activity}</p>}
 
         {profile.bio && (
           <p className="mt-2.5 text-sm leading-relaxed wrap-break-word whitespace-pre-wrap">{profile.bio}</p>

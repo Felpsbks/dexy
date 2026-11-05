@@ -4,6 +4,7 @@ export interface DesktopPrefs {
   minimizeToTray: boolean;
   openOnStartup: boolean;
   startMinimized: boolean;
+  shareActivity?: boolean;
   shortcuts: { toggleMute: string; toggleDeafen: string; saveClip?: string };
   version?: string;
 }
@@ -32,6 +33,8 @@ export interface DexyDesktop {
   onPushToTalk?(cb: (down: boolean) => void): () => void;
   saveClip?(data: Uint8Array): Promise<string | null>;
   showClip?(path: string): void;
+  getActivity?(): Promise<string | null>;
+  onActivity?(cb: (game: string | null) => void): () => void;
 }
 
 export function getDesktop(): DexyDesktop | null {
