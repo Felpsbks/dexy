@@ -263,6 +263,41 @@ export function VoiceVideoSettings() {
       </section>
 
       <section className="space-y-3">
+        <div className="text-xs uppercase text-muted-foreground font-semibold">Clipes</div>
+        <label className="flex items-start justify-between gap-4 p-4 border border-border rounded-xl bg-card">
+          <div>
+            <div className="font-medium">Gravar clipes enquanto transmito</div>
+            <div className="text-sm text-muted-foreground">
+              Guarda o que você transmite para salvar os últimos segundos com um atalho. Usa mais CPU enquanto compartilha a tela.
+            </div>
+          </div>
+          <Toggle
+            label="Gravar clipes"
+            on={settings.clipsEnabled}
+            onChange={(v) => updateVoiceSettings({ clipsEnabled: v })}
+          />
+        </label>
+        {settings.clipsEnabled && (
+          <div className="flex items-center justify-between gap-4 p-4 border border-border rounded-xl bg-card">
+            <div className="font-medium">Duração mínima do clipe</div>
+            <div className="flex gap-1 rounded-lg bg-secondary p-1">
+              {[15, 30, 60].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => updateVoiceSettings({ clipLengthSeconds: n })}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+                    settings.clipLengthSeconds === n ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {n}s
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
         <div className="text-xs uppercase text-muted-foreground font-semibold">Processamento de voz</div>
         <label className="flex items-start justify-between gap-4 p-4 border border-border rounded-xl bg-card">
           <div>

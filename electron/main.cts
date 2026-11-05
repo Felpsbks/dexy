@@ -25,13 +25,17 @@ interface DesktopPrefs {
   minimizeToTray: boolean;
   openOnStartup: boolean;
   startMinimized: boolean;
-  shortcuts: { toggleMute: string; toggleDeafen: string };
+  shortcuts: { toggleMute: string; toggleDeafen: string; saveClip: string };
 }
 const DEFAULT_PREFS: DesktopPrefs = {
   minimizeToTray: true,
   openOnStartup: false,
   startMinimized: false,
-  shortcuts: { toggleMute: "CommandOrControl+Shift+M", toggleDeafen: "CommandOrControl+Shift+D" },
+  shortcuts: {
+    toggleMute: "CommandOrControl+Shift+M",
+    toggleDeafen: "CommandOrControl+Shift+D",
+    saveClip: "CommandOrControl+Shift+C",
+  },
 };
 const prefsFile = () => path.join(app.getPath("userData"), "desktop-prefs.json");
 function loadPrefs(): DesktopPrefs {
@@ -82,6 +86,7 @@ function registerShortcuts() {
   };
   bind(prefs.shortcuts.toggleMute, "toggle-mute");
   bind(prefs.shortcuts.toggleDeafen, "toggle-deafen");
+  bind(prefs.shortcuts.saveClip, "save-clip");
 }
 
 function buildTray() {
@@ -151,7 +156,10 @@ function createWindow(startHidden: boolean) {
     }
   });
   win.on("focus", () => win?.flashFrame(false));
-  win.webContents.on("did-navigate", resetPickerReady);
+  // Before the new document loads, so its "picker ready" can never be wiped.
+  win.webContents.on("did-start-navigation", (details) => {
+    if (details.isMainFrame && !details.isSameDocument) resetPickerReady();
+  });
   // Links to other sites open in the real browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (!url.startsWith(APP_ORIGIN)) void shell.openExternal(url);
@@ -189,6 +197,18 @@ function registerIpc(refreshTray: () => void) {
       win.setOverlayIcon(nativeImage.createFromDataURL(pngDataUrl), `${n} não lidas`);
     }
     tray?.setToolTip(n ? `Dexy · ${n} não lidas` : "Dexy");
+  });
+  const clipsDir = () => path.join(app.getPath("videos"), "Dexy Clipes");
+  ipcMain.handle("dexy:save-clip", async (e, data: Uint8Array) => {
+    if (!fromApp(e) || !(data instanceof Uint8Array) || data.byteLength > 2_000_000_000) return null;
+    await fs.promises.mkdir(clipsDir(), { recursive: true });
+    const name = `clipe-${new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "-")}.webm`;
+    const file = path.join(clipsDir(), name);
+    await fs.promises.writeFile(file, data);
+    return file;
+  });
+  ipcMain.on("dexy:show-clip", (e, file: string) => {
+    if (fromApp(e) && typeof file === "string" && path.dirname(file) === clipsDir()) shell.showItemInFolder(file);
   });
   ipcMain.on("dexy:flash", (e) => {
     if (fromApp(e) && win && !win.isFocused()) win.flashFrame(true);

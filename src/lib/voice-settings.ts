@@ -14,6 +14,9 @@ export interface VoiceSettings {
   // KeyboardEvent.code ("Backquote", "KeyV", "F13"...) or "Mouse4"/"Mouse5".
   pttKey: string;
   pttReleaseDelay: number;
+  // Off by default: two background recorders cost CPU while sharing.
+  clipsEnabled: boolean;
+  clipLengthSeconds: number;
 }
 
 const KEY = "dexy.voiceSettings";
@@ -24,6 +27,8 @@ const DEFAULTS: VoiceSettings = {
   inputMode: "voice",
   pttKey: "Backquote",
   pttReleaseDelay: 200,
+  clipsEnabled: false,
+  clipLengthSeconds: 30,
 };
 const EVENT = "dexy:voice-settings";
 

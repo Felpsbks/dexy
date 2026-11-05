@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld("dexyDesktop", {
     return () => ipcRenderer.removeListener("dexy:pick-source", h);
   },
   pickSourceResult: (id: string | null) => ipcRenderer.send("dexy:picker-result", id),
+  saveClip: (data: Uint8Array) => ipcRenderer.invoke("dexy:save-clip", data),
+  showClip: (file: string) => ipcRenderer.send("dexy:show-clip", file),
   setPushToTalk: (cfg: { enabled: boolean; code: string }) => ipcRenderer.send("dexy:set-ptt", cfg),
   onPushToTalk: (cb: (down: boolean) => void) => {
     const h = (_e: IpcRendererEvent, down: boolean) => cb(!!down);

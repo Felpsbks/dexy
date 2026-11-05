@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { ChevronUp } from "lucide-react";
+import { ChevronUp, Clapperboard } from "lucide-react";
+import { saveClip } from "@/lib/clips";
+import { useVoiceSettings } from "@/lib/voice-settings";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DEFAULT_SCREEN_SHARE_QUALITY,
@@ -108,5 +110,20 @@ export function ScreenShareQualityPicker({
         </p>
       </PopoverContent>
     </Popover>
+  );
+}
+
+export function SaveClipButton({ sharing }: { sharing: boolean }) {
+  const { clipsEnabled } = useVoiceSettings();
+  if (!sharing || !clipsEnabled) return null;
+  return (
+    <button
+      onClick={() => void saveClip()}
+      title="Salvar clipe"
+      aria-label="Salvar clipe"
+      className="w-10 h-10 rounded-full grid place-items-center bg-secondary text-foreground hover:bg-secondary/70 transition"
+    >
+      <Clapperboard className="w-4 h-4" />
+    </button>
   );
 }

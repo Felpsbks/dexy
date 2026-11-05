@@ -122,6 +122,7 @@ import { buildVersionLabel } from "@/lib/app-version";
 import { declineDmCall, useIncomingDmCall } from "@/lib/incoming-call";
 import { getDesktop, notifyNative } from "@/lib/desktop";
 import { usePushToTalkKeys } from "@/lib/ptt";
+import { saveClip } from "@/lib/clips";
 import { getChannelReply, mentionsHandle, renderWithMentions, setChannelReply, useChannelReply } from "@/lib/channel-reply";
 import { typingLabel, useTypingIndicator } from "@/lib/typing";
 import { IncomingCallCard } from "@/components/DmCall";
@@ -670,6 +671,7 @@ function AppPage() {
     if (!d) return;
     return d.onShortcut((action) => {
       if (action === "toggle-mute") void shortcutCallRef.current?.toggleMic();
+      else if (action === "save-clip") void saveClip();
       else setDeafened((v) => !v);
     });
   }, []);

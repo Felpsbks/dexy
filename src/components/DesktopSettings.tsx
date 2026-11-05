@@ -84,11 +84,12 @@ export function DesktopSettings() {
           [
             ["toggleMute", "Mutar / desmutar microfone"],
             ["toggleDeafen", "Ensurdecer / ouvir"],
+            ["saveClip", "Salvar clipe"],
           ] as const
         ).map(([k, label]) => (
           <div key={k} className="flex items-center justify-between gap-4 p-4 border border-border rounded-xl bg-card">
             <div className="font-medium">{label}</div>
-            <ShortcutInput value={prefs.shortcuts[k]} onChange={(v) => void update({ shortcuts: { ...prefs.shortcuts, [k]: v } })} />
+            <ShortcutInput value={prefs.shortcuts[k] ?? ""} onChange={(v) => void update({ shortcuts: { ...prefs.shortcuts, [k]: v } })} />
           </div>
         ))}
       </section>

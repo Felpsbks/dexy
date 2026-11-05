@@ -4,7 +4,7 @@ export interface DesktopPrefs {
   minimizeToTray: boolean;
   openOnStartup: boolean;
   startMinimized: boolean;
-  shortcuts: { toggleMute: string; toggleDeafen: string };
+  shortcuts: { toggleMute: string; toggleDeafen: string; saveClip?: string };
   version?: string;
 }
 
@@ -25,11 +25,13 @@ export interface DexyDesktop {
   focus(): void;
   getPrefs(): Promise<DesktopPrefs | null>;
   setPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs | null>;
-  onShortcut(cb: (action: "toggle-mute" | "toggle-deafen") => void): () => void;
+  onShortcut(cb: (action: "toggle-mute" | "toggle-deafen" | "save-clip") => void): () => void;
   onPickSource(cb: (sources: PickerSource[]) => void): () => void;
   pickSourceResult(id: string | null): void;
   setPushToTalk?(cfg: { enabled: boolean; code: string }): void;
   onPushToTalk?(cb: (down: boolean) => void): () => void;
+  saveClip?(data: Uint8Array): Promise<string | null>;
+  showClip?(path: string): void;
 }
 
 export function getDesktop(): DexyDesktop | null {

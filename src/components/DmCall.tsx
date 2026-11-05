@@ -29,7 +29,7 @@ import {
 import { avatarFor } from "@/lib/format";
 import { SpeakingAwareAvatar } from "@/components/SpeakingAwareAvatar";
 import { ParticipantContextMenu, RemoteAudio } from "@/components/RemoteAudio";
-import { ScreenShareQualityPicker, useScreenShareQuality } from "@/components/ScreenShareQualityPicker";
+import { SaveClipButton, ScreenShareQualityPicker, useScreenShareQuality } from "@/components/ScreenShareQualityPicker";
 import type { Database } from "@/lib/database.types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -683,6 +683,7 @@ export function ActiveCallView({
           label="Câmera"
         />
                 <ScreenShareQualityPicker value={screenShareQuality} onChange={setScreenShareQuality} />
+        <SaveClipButton sharing={screenShareEnabled} />
         <ControlButton
           active={screenShareEnabled}
           onClick={() =>

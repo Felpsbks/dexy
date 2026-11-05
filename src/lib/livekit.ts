@@ -17,6 +17,7 @@ import {
 } from "livekit-client";
 import { getSelectedAudioDevice } from "./audio-devices";
 import { getVoiceSettings, onVoiceSettingsChange } from "./voice-settings";
+import { startClipBuffer, stopClipBuffer } from "./clips";
 
 // Discord uses ~128kbps Opus for voice channels. LiveKit's
 // musicHighQualityStereo preset matches that: 128kbps stereo, which gives a
@@ -407,6 +408,14 @@ export async function applyScreenShareQuality(room: Room | null, q: ScreenShareQ
 // track(s) directly so the browser closing/revoking the capture (native stop
 // button, closing the shared tab/window, OS yanking permission) is always
 // caught, not just app-initiated stops.
+function syncClipBuffer(room: Room) {
+  const lp = room.localParticipant;
+  const tracks = [Track.Source.ScreenShare, Track.Source.ScreenShareAudio]
+    .map((src) => lp.getTrackPublication(src)?.track?.mediaStreamTrack)
+    .filter((t): t is MediaStreamTrack => !!t);
+  startClipBuffer(tracks);
+}
+
 function watchScreenShareEnded(room: Room, onEnded: () => void) {
   const lp = room.localParticipant;
   const videoTrack = lp.getTrackPublication(Track.Source.ScreenShare)?.track;
@@ -434,6 +443,7 @@ function watchScreenShareEnded(room: Room, onEnded: () => void) {
           } catch {
             // already unpublished/torn down by something else -- nothing left to do
           }
+          stopClipBuffer();
           onEnded();
         })();
       },
@@ -471,6 +481,7 @@ async function swapOrStartScreenShare(
   if (!lp.isScreenShareEnabled) {
     await lp.setScreenShareEnabled(true, captureOptions, publishOptions);
     if (quality.resolution === "source") await applyScreenShareQuality(room, quality);
+    syncClipBuffer(room);
     if (onEnded) watchScreenShareEnded(room, onEnded);
     return;
   }
@@ -483,10 +494,12 @@ async function swapOrStartScreenShare(
     await lp.publishTrack(track, track.source === Track.Source.ScreenShare ? publishOptions : undefined);
   }
   if (quality.resolution === "source") await applyScreenShareQuality(room, quality);
+  syncClipBuffer(room);
   if (onEnded) watchScreenShareEnded(room, onEnded);
 }
 
 async function stopScreenShare(room: Room) {
+  stopClipBuffer();
   await room.localParticipant.setScreenShareEnabled(false);
 }
 
