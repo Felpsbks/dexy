@@ -37,13 +37,16 @@ export default defineConfig(async ({ command, mode }) => {
     // per-user dynamic values (wallpaper, banner/accent colors).
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      // wasm-unsafe-eval + integrations.livekit.io: the Krisp noise filter's
+      // WASM engine, audio worklet and model endpoint. Blocked, Krisp fails
+      // silently and the mic goes out unfiltered.
+      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://integrations.livekit.io",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       `img-src 'self' data: blob: https://${supabaseHost} https://api.dicebear.com https://i.pravatar.cc`,
       "font-src 'self' https://fonts.gstatic.com",
       "media-src 'self' blob:",
       "worker-src 'self' blob:",
-      `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://${livekitHost} wss://${livekitHost}`,
+      `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://${livekitHost} wss://${livekitHost} https://integrations.livekit.io`,
       "frame-src 'none'",
       "object-src 'none'",
       "base-uri 'none'",
