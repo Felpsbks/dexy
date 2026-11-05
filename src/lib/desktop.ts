@@ -28,6 +28,8 @@ export interface DexyDesktop {
   onShortcut(cb: (action: "toggle-mute" | "toggle-deafen") => void): () => void;
   onPickSource(cb: (sources: PickerSource[]) => void): () => void;
   pickSourceResult(id: string | null): void;
+  setPushToTalk?(cfg: { enabled: boolean; code: string }): void;
+  onPushToTalk?(cb: (down: boolean) => void): () => void;
 }
 
 export function getDesktop(): DexyDesktop | null {

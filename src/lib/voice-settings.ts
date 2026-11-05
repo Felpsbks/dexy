@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 export type NoiseSuppressionMode = "krisp" | "standard" | "off";
+export type InputMode = "voice" | "ptt";
 
 export interface VoiceSettings {
   noiseSuppression: NoiseSuppressionMode;
@@ -9,6 +10,10 @@ export interface VoiceSettings {
   // background voice ~13 dB (to nearly the level of the main speaker) while
   // leaving the main speaker unchanged.
   autoGainControl: boolean;
+  inputMode: InputMode;
+  // KeyboardEvent.code ("Backquote", "KeyV", "F13"...) or "Mouse4"/"Mouse5".
+  pttKey: string;
+  pttReleaseDelay: number;
 }
 
 const KEY = "dexy.voiceSettings";
@@ -16,6 +21,9 @@ const DEFAULTS: VoiceSettings = {
   noiseSuppression: "krisp",
   echoCancellation: true,
   autoGainControl: false,
+  inputMode: "voice",
+  pttKey: "Backquote",
+  pttReleaseDelay: 200,
 };
 const EVENT = "dexy:voice-settings";
 

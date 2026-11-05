@@ -63,6 +63,7 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.42.2",
     "input-otp": "^1.4.2",
+    "koffi": "^3.3.7",
     "livekit-client": "^2.21.0",
     "livekit-server-sdk": "^2.17.0",
     "lucide-react": "^0.575.0",
@@ -103,6 +104,7 @@
     "wrangler": "^4.120.1"
   },
   "allowScripts": {
-    "electron@33.4.11": true
+    "electron@33.4.11": true,
+    "koffi@3.3.7": true
   }
 }

@@ -139,6 +139,7 @@ async function applyKrispNoiseFilter(room: Room) {
   const wantKrisp = getVoiceSettings().noiseSuppression === "krisp";
   if (!wantKrisp) {
     if (track.getProcessor()) await track.stopProcessor().catch(() => {});
+    applyMicGate(room);
     return;
   }
   if (track.getProcessor()) return;
@@ -149,16 +150,66 @@ async function applyKrispNoiseFilter(room: Room) {
     // "medium", main voice unchanged. BVC (background voice cancellation, the
     // same model family as Discord's krisp-bvc-o-pro) only engages on mics in
     // Krisp's compatible-device list and silently stays off otherwise.
+    // With a processor attached track.mediaStreamTrack returns the processed
+    // track, so keep the raw capture: push-to-talk may have disabled it.
+    const rawCapture = track.mediaStreamTrack;
     await track.setProcessor(krisp.KrispNoiseFilter({ quality: "high", useBVC: true }));
+    // The sender now carries Krisp's output: gate that, then let the raw
+    // capture feed Krisp (in this order, so nothing leaks while PTT is up).
+    applyMicGate(room);
+    rawCapture.enabled = true;
   } catch (err) {
     console.warn("Krisp noise filter unavailable, continuing without it", err);
   }
+}
+
+// Push-to-talk gate: in PTT mode the capture track is disabled (silence is
+// sent, the publication stays live) except while the key is held, so
+// pressing is instant and Krisp stays attached. The mute button still works
+// on top of this as an override.
+let pttHeld = false;
+let pttReleaseTimer: ReturnType<typeof setTimeout> | null = null;
+
+function applyMicGate(room: Room) {
+  const track = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
+  if (!track) return;
+  const open = getVoiceSettings().inputMode !== "ptt" || pttHeld;
+  // Gate what is actually sent (Krisp's processed track when it's attached),
+  // never the raw capture Krisp reads from.
+  const sent = track.sender?.track ?? track.mediaStreamTrack;
+  if (sent) sent.enabled = open;
+}
+
+function gateAllMics() {
+  for (const room of roomsWithMic) {
+    if (room.state === "disconnected") roomsWithMic.delete(room);
+    else applyMicGate(room);
+  }
+}
+
+export function setPushToTalkHeld(down: boolean) {
+  if (pttReleaseTimer) clearTimeout(pttReleaseTimer);
+  pttReleaseTimer = null;
+  if (down) {
+    pttHeld = true;
+    gateAllMics();
+    return;
+  }
+  pttReleaseTimer = setTimeout(() => {
+    pttHeld = false;
+    gateAllMics();
+  }, Math.max(0, getVoiceSettings().pttReleaseDelay));
+}
+
+export function isPushToTalkHeld() {
+  return pttHeld;
 }
 
 async function enableMic(room: Room, enabled: boolean) {
   await room.localParticipant.setMicrophoneEnabled(enabled, await buildMicCaptureOptions());
   if (enabled) {
     roomsWithMic.add(room);
+    applyMicGate(room);
     void applyKrispNoiseFilter(room);
   }
 }
@@ -166,7 +217,19 @@ async function enableMic(room: Room, enabled: boolean) {
 // Settings changed mid-call: re-capture with the new constraints and add or
 // drop Krisp on every live mic, without leaving the call.
 if (typeof window !== "undefined") {
+  const captureKey = () => {
+    const p = getVoiceSettings();
+    return `${p.noiseSuppression}|${p.echoCancellation}|${p.autoGainControl}`;
+  };
+  let lastCaptureKey = captureKey();
   onVoiceSettingsChange(() => {
+    const key = captureKey();
+    if (key === lastCaptureKey) {
+      // Only PTT/input-mode changed: re-gate, no mic restart.
+      gateAllMics();
+      return;
+    }
+    lastCaptureKey = key;
     for (const room of roomsWithMic) {
       if (room.state === "disconnected") {
         roomsWithMic.delete(room);
@@ -177,6 +240,7 @@ if (typeof window !== "undefined") {
       void (async () => {
         await track.stopProcessor().catch(() => {});
         await track.restartTrack(await buildMicCaptureOptions()).catch((err) => console.warn("mic restart failed", err));
+        applyMicGate(room);
         await applyKrispNoiseFilter(room);
       })();
     }

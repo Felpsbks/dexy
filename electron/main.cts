@@ -13,6 +13,7 @@ import {
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { registerDisplayMediaHandler, resetPickerReady } from "./display-media-handler.cjs";
+import { registerPushToTalk } from "./ptt.cjs";
 
 const APP_URL = process.env.DEXY_DESKTOP_URL ?? (app.isPackaged ? "https://dexy.site" : "http://localhost:8080");
 const APP_ORIGIN = new URL(APP_URL).origin;
@@ -213,6 +214,8 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc(refreshTray);
     createWindow(startHidden);
     registerShortcuts();
+    const stopPtt = registerPushToTalk(() => win);
+    app.on("will-quit", stopPtt);
 
     app.on("activate", () => (win ? showWindow() : createWindow(false)));
   });

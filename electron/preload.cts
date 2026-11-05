@@ -42,4 +42,10 @@ contextBridge.exposeInMainWorld("dexyDesktop", {
     return () => ipcRenderer.removeListener("dexy:pick-source", h);
   },
   pickSourceResult: (id: string | null) => ipcRenderer.send("dexy:picker-result", id),
+  setPushToTalk: (cfg: { enabled: boolean; code: string }) => ipcRenderer.send("dexy:set-ptt", cfg),
+  onPushToTalk: (cb: (down: boolean) => void) => {
+    const h = (_e: IpcRendererEvent, down: boolean) => cb(!!down);
+    ipcRenderer.on("dexy:ptt", h);
+    return () => ipcRenderer.removeListener("dexy:ptt", h);
+  },
 });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, Square } from "lucide-react";
+import { prettyKey } from "@/lib/ptt";
 import {
   enumerateAudioDevices,
   getSelectedAudioDevice,
@@ -114,6 +115,42 @@ function MicTest() {
   );
 }
 
+function PttKeyRecorder({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const [recording, setRecording] = useState(false);
+  useEffect(() => {
+    if (!recording) return;
+    const key = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code !== "Escape") onChange(e.code);
+      setRecording(false);
+    };
+    const mouse = (e: MouseEvent) => {
+      if (e.button < 1) return;
+      e.preventDefault();
+      onChange(`Mouse${e.button + 1}`);
+      setRecording(false);
+    };
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("mousedown", mouse, true);
+    return () => {
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("mousedown", mouse, true);
+    };
+  }, [recording, onChange]);
+  return (
+    <button
+      onClick={() => setRecording(true)}
+      onContextMenu={(e) => e.preventDefault()}
+      className={`min-w-48 h-9 px-3 rounded-lg border text-sm transition ${
+        recording ? "border-primary text-primary animate-pulse" : "border-border bg-background/40"
+      }`}
+    >
+      {recording ? "Pressione uma tecla ou botão do mouse…" : prettyKey(value)}
+    </button>
+  );
+}
+
 export function VoiceVideoSettings() {
   const settings = useVoiceSettings();
   const [devices, setDevices] = useState<AudioDevice[]>([]);
@@ -148,6 +185,62 @@ export function VoiceVideoSettings() {
       </section>
 
       <MicTest />
+
+      <section className="space-y-2">
+        <div className="text-xs uppercase text-muted-foreground font-semibold">Modo de entrada</div>
+        <div className="grid grid-cols-2 gap-2" role="radiogroup">
+          {(
+            [
+              ["voice", "Detecção de voz", "Transmite quando você fala."],
+              ["ptt", "Aperte para falar", "Só transmite enquanto segura a tecla."],
+            ] as const
+          ).map(([v, label, desc]) => (
+            <button
+              key={v}
+              role="radio"
+              aria-checked={settings.inputMode === v}
+              onClick={() => updateVoiceSettings({ inputMode: v })}
+              className={`text-left p-4 rounded-xl border transition ${
+                settings.inputMode === v ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-secondary/40"
+              }`}
+            >
+              <div className="font-medium">{label}</div>
+              <div className="text-sm text-muted-foreground">{desc}</div>
+            </button>
+          ))}
+        </div>
+        {settings.inputMode === "ptt" && (
+          <div className="space-y-3 p-4 border border-border rounded-xl bg-card">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-medium">Atalho</div>
+                <div className="text-sm text-muted-foreground">
+                  {typeof window !== "undefined" && (window as unknown as { dexyDesktop?: unknown }).dexyDesktop
+                    ? "Funciona em qualquer lugar, inclusive dentro do jogo."
+                    : "No navegador funciona com o Dexy em foco. No app desktop funciona em qualquer lugar."}
+                </div>
+              </div>
+              <PttKeyRecorder value={settings.pttKey} onChange={(code) => updateVoiceSettings({ pttKey: code })} />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Atraso ao soltar</span>
+                <span className="tabular-nums text-muted-foreground">{settings.pttReleaseDelay} ms</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1000}
+                step={20}
+                value={settings.pttReleaseDelay}
+                onChange={(e) => updateVoiceSettings({ pttReleaseDelay: Number(e.target.value) })}
+                className="w-full accent-[var(--primary)]"
+                aria-label="Atraso ao soltar"
+              />
+            </div>
+          </div>
+        )}
+      </section>
 
       <section className="space-y-2">
         <div className="text-xs uppercase text-muted-foreground font-semibold">Supressão de ruído</div>

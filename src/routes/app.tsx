@@ -121,6 +121,7 @@ import { markGuestSignedOut } from "@/lib/guestDevice";
 import { buildVersionLabel } from "@/lib/app-version";
 import { declineDmCall, useIncomingDmCall } from "@/lib/incoming-call";
 import { getDesktop, notifyNative } from "@/lib/desktop";
+import { usePushToTalkKeys } from "@/lib/ptt";
 import { getChannelReply, mentionsHandle, renderWithMentions, setChannelReply, useChannelReply } from "@/lib/channel-reply";
 import { typingLabel, useTypingIndicator } from "@/lib/typing";
 import { IncomingCallCard } from "@/components/DmCall";
@@ -645,6 +646,7 @@ function AppPage() {
 
   // Desktop app integration: taskbar unread badge, native notifications for
   // new notifications while Dexy is unfocused, and global mute/deafen keys.
+  usePushToTalkKeys();
   const desktopUnread = notifications.filter((n) => !n.read).length;
   useEffect(() => getDesktop()?.setBadge(desktopUnread), [desktopUnread]);
   const notifClickRef = useRef<(n: Notification) => void>(() => {});
